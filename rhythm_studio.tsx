@@ -3,7 +3,7 @@ import {
   Play, Square, Volume2, VolumeX, Settings, 
   Trash2, Sliders, Cpu, Save, FolderOpen, 
   Download, Activity, ArrowRight, Minus, Plus, Repeat, Layers,
-  AudioLines, Zap
+  Radio, Zap
 } from 'lucide-react';
 
 // Utilidad para repetir patrones de 16 pasos 4 veces
@@ -716,7 +716,7 @@ export default function RhythmStudio() {
                 {/* Reverb Knob */}
                 <div className="flex flex-col items-center gap-1 flex-1">
                   <div className={`p-1.5 rounded-full ${masterReverb > 0 ? 'bg-cyan-500/20 text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.3)]' : 'bg-slate-800 text-slate-500'}`}>
-                    <AudioLines className="w-4 h-4" />
+                    <Radio className="w-4 h-4" />
                   </div>
                   <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">Reverb</span>
                   <input 
