@@ -2,8 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Play, Square, Volume2, VolumeX, Settings, 
   Trash2, Sliders, Cpu, Save, FolderOpen, 
-  Download, Activity, ArrowRight, Minus, Plus
+  Download, Activity, ArrowRight, Minus, Plus, Repeat
 } from 'lucide-react';
+
+// Utilidad para repetir patrones de 16 pasos 4 veces
+const rep16 = (arr) => [...arr, ...arr, ...arr, ...arr];
 
 // Instrumentos y sus colores
 const INSTRUMENTS = [
@@ -20,44 +23,90 @@ const PRESETS = {
   vacio: {
     name: 'Vacío',
     grid: {
-      BD: Array(16).fill(0), SD: Array(16).fill(0), CP: Array(16).fill(0),
-      CH: Array(16).fill(0), OH: Array(16).fill(0), TM: Array(16).fill(0), CB: Array(16).fill(0)
+      BD: Array(64).fill(0), SD: Array(64).fill(0), CP: Array(64).fill(0),
+      CH: Array(64).fill(0), OH: Array(64).fill(0), TM: Array(64).fill(0), CB: Array(64).fill(0)
     }
   },
   house: {
     name: 'Classic House',
     grid: {
-      BD: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
-      SD: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      CP: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-      CH: [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0],
-      OH: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
-      TM: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      CB: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+      BD: rep16([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]),
+      SD: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      CP: rep16([0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]),
+      CH: rep16([0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      OH: rep16([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]),
+      TM: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      CB: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     }
   },
   trap: {
-    name: 'Trap Bouncer',
+    name: 'Trap',
     grid: {
-      BD: [1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0],
-      SD: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-      CP: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      CH: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-      OH: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      TM: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      CB: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+      BD: rep16([1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0]),
+      SD: rep16([0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]),
+      CP: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      CH: rep16([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
+      OH: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      TM: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      CB: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     }
   },
   reggaeton: {
     name: 'Dembow',
     grid: {
-      BD: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
-      SD: [0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0],
-      CP: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      CH: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
-      OH: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      TM: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      CB: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+      BD: rep16([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]),
+      SD: rep16([0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0]),
+      CP: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      CH: rep16([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]),
+      OH: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      TM: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      CB: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    }
+  },
+  techno: {
+    name: 'Techno',
+    grid: {
+      BD: rep16([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]),
+      SD: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      CP: rep16([0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]),
+      CH: rep16([0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      OH: rep16([0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      TM: [
+        ...[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        ...[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+        ...[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        ...[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0]
+      ],
+      CB: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    }
+  },
+  hiphop: {
+    name: 'Hip Hop',
+    grid: {
+      BD: [
+        ...[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+        ...[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0],
+        ...[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+        ...[1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0]
+      ],
+      SD: rep16([0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]),
+      CP: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      CH: rep16([1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]),
+      OH: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+      TM: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      CB: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    }
+  },
+  dnb: {
+    name: 'Drum & Bass',
+    grid: {
+      BD: rep16([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0]),
+      SD: rep16([0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]),
+      CP: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      CH: rep16([1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]),
+      OH: rep16([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]),
+      TM: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      CB: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     }
   }
 };
@@ -72,7 +121,11 @@ export default function RhythmStudio() {
   const [currentPreset, setCurrentPreset] = useState('vacio');
   const [showSettings, setShowSettings] = useState(false);
 
-  // Estado de la Cuadrícula
+  // Estado de Paginación (64 pasos en 4 páginas de 16)
+  const [currentPage, setCurrentPage] = useState(0); 
+  const [autoFollow, setAutoFollow] = useState(true);
+
+  // Estado de la Cuadrícula (64 pasos)
   const [drumGrid, setDrumGrid] = useState(PRESETS.vacio.grid);
 
   // Mixer
@@ -112,6 +165,16 @@ export default function RhythmStudio() {
   const lookahead = 25.0;
   const timerIdRef = useRef(null);
 
+  // Auto-Follow de Página
+  useEffect(() => {
+    if (autoFollow && activeStep !== -1) {
+      const pageOfStep = Math.floor(activeStep / 16);
+      if (pageOfStep !== currentPage) {
+        setCurrentPage(pageOfStep);
+      }
+    }
+  }, [activeStep, autoFollow, currentPage]);
+
   // Inicialización de Audio
   const initAudio = () => {
     if (!audioCtxRef.current) {
@@ -120,7 +183,7 @@ export default function RhythmStudio() {
         const ctx = new AudioContext();
         audioCtxRef.current = ctx;
         
-        // Crear Buffer de Ruido (para Snare, Clap, Hats)
+        // Crear Buffer de Ruido
         const bufferSize = ctx.sampleRate * 2;
         const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
         const data = buffer.getChannelData(0);
@@ -160,7 +223,7 @@ export default function RhythmStudio() {
 
   // Cargar estado de LocalStorage
   useEffect(() => {
-    const savedState = localStorage.getItem('rhythm_studio_state');
+    const savedState = localStorage.getItem('rhythm_studio_state_64');
     if (savedState) {
       try {
         const state = JSON.parse(savedState);
@@ -174,7 +237,7 @@ export default function RhythmStudio() {
   // Guardar estado en LocalStorage
   const saveStateLocally = () => {
     const state = { grid: drumGrid, tempo, volumes };
-    localStorage.setItem('rhythm_studio_state', JSON.stringify(state));
+    localStorage.setItem('rhythm_studio_state_64', JSON.stringify(state));
   };
 
   // --- SÍNTESIS DE INSTRUMENTOS ---
@@ -189,21 +252,17 @@ export default function RhythmStudio() {
     instGain.connect(masterGainRef.current);
 
     if (inst === 'BD') {
-      // KICK (BOMBO)
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(instGain);
-
       osc.frequency.setValueAtTime(150, time);
       osc.frequency.exponentialRampToValueAtTime(45, time + 0.1);
       gain.gain.setValueAtTime(1.0, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + 0.5);
       osc.start(time);
       osc.stop(time + 0.5);
-
     } else if (inst === 'SD') {
-      // SNARE (CAJA)
       const noiseSource = ctx.createBufferSource();
       noiseSource.buffer = noiseBufferRef.current;
       const noiseFilter = ctx.createBiquadFilter();
@@ -212,7 +271,6 @@ export default function RhythmStudio() {
       const noiseGain = ctx.createGain();
       noiseGain.gain.setValueAtTime(0.8, time);
       noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
-      
       noiseSource.connect(noiseFilter);
       noiseFilter.connect(noiseGain);
       noiseGain.connect(instGain);
@@ -223,7 +281,6 @@ export default function RhythmStudio() {
       const toneGain = ctx.createGain();
       toneGain.gain.setValueAtTime(0.5, time);
       toneGain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
-      
       toneOsc.connect(toneGain);
       toneGain.connect(instGain);
 
@@ -231,14 +288,11 @@ export default function RhythmStudio() {
       noiseSource.stop(time + 0.2);
       toneOsc.start(time);
       toneOsc.stop(time + 0.1);
-
     } else if (inst === 'CP') {
-      // CLAP (PALMAS) - Simulamos 3 clicks seguidos
       const filter = ctx.createBiquadFilter();
       filter.type = 'bandpass';
       filter.frequency.value = 1500;
       filter.Q.value = 0.5;
-      
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(0, time);
       gain.gain.setValueAtTime(1, time + 0.01);
@@ -250,16 +304,12 @@ export default function RhythmStudio() {
       
       const noiseSource = ctx.createBufferSource();
       noiseSource.buffer = noiseBufferRef.current;
-      
       noiseSource.connect(filter);
       filter.connect(gain);
       gain.connect(instGain);
-      
       noiseSource.start(time);
       noiseSource.stop(time + 0.3);
-
     } else if (inst === 'CH' || inst === 'OH') {
-      // HI-HAT (CERRADO Y ABIERTO)
       const source = ctx.createBufferSource();
       source.buffer = noiseBufferRef.current;
       const filter = ctx.createBiquadFilter();
@@ -272,30 +322,23 @@ export default function RhythmStudio() {
       
       gain.gain.setValueAtTime(0.7, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + decay);
-      
       source.connect(filter);
       filter.connect(gain);
       gain.connect(instGain);
-      
       source.start(time);
       source.stop(time + decay);
-
     } else if (inst === 'TM') {
-      // TOM
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(instGain);
-
       osc.frequency.setValueAtTime(180, time);
       osc.frequency.exponentialRampToValueAtTime(100, time + 0.15);
       gain.gain.setValueAtTime(0.8, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + 0.4);
       osc.start(time);
       osc.stop(time + 0.4);
-
     } else if (inst === 'CB') {
-      // COWBELL (CENCERRO)
       const osc1 = ctx.createOscillator();
       osc1.type = 'square';
       osc1.frequency.setValueAtTime(540, time);
@@ -308,12 +351,10 @@ export default function RhythmStudio() {
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(0.5, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
-      
       osc1.connect(filter);
       osc2.connect(filter);
       filter.connect(gain);
       gain.connect(instGain);
-      
       osc1.start(time);
       osc2.start(time);
       osc1.stop(time + 0.2);
@@ -325,7 +366,6 @@ export default function RhythmStudio() {
   const scheduleNextStep = (step, baseTime) => {
     const currentGrid = drumGridRef.current;
     
-    // Aplicar Swing: si es un paso impar (1, 3, 5) lo retrasamos
     let time = baseTime;
     if (step % 2 !== 0) {
       const secondsPerBeat = 60.0 / tempoRef.current;
@@ -354,7 +394,8 @@ export default function RhythmStudio() {
       const scheduledStep = currentStepRef.current;
       setTimeout(() => setActiveStep(scheduledStep), 0);
 
-      currentStepRef.current = (currentStepRef.current + 1) % 16;
+      // Avanzamos por los 64 pasos completos
+      currentStepRef.current = (currentStepRef.current + 1) % 64;
     }
     
     timerIdRef.current = setTimeout(scheduler, lookahead);
@@ -368,19 +409,21 @@ export default function RhythmStudio() {
       setActiveStep(-1);
     } else {
       setIsPlaying(true);
-      currentStepRef.current = 0;
+      currentStepRef.current = 0; // Opcional: quitar esto si quieres que empiece donde se pausó
       nextStepTimeRef.current = audioCtxRef.current.currentTime + 0.05;
       scheduler();
     }
   };
 
   // Interacción UI
-  const toggleStep = (inst, index) => {
+  const toggleStep = (inst, indexInPage) => {
     initAudio();
+    const globalIndex = currentPage * 16 + indexInPage;
+
     setDrumGrid(prev => {
       const copy = { ...prev };
       const row = [...copy[inst]];
-      row[index] = row[index] ? 0 : 1;
+      row[globalIndex] = row[globalIndex] ? 0 : 1;
       copy[inst] = row;
       return copy;
     });
@@ -389,6 +432,7 @@ export default function RhythmStudio() {
   const loadPreset = (presetKey) => {
     setCurrentPreset(presetKey);
     setDrumGrid(PRESETS[presetKey].grid);
+    setCurrentPage(0);
   };
 
   const clearGrid = () => loadPreset('vacio');
@@ -452,11 +496,12 @@ export default function RhythmStudio() {
         </div>
 
         <div className="flex gap-2">
-          <button onClick={() => saveStateLocally()} className="p-2 text-slate-400 hover:text-white bg-slate-800 rounded-lg transition-colors" title="Guardar Patrón en el Navegador">
+          <button onClick={() => saveStateLocally()} className="p-2 text-slate-400 hover:text-white bg-slate-800 rounded-lg transition-colors" title="Guardar Canción en el Navegador">
             <Save className="w-4 h-4" />
           </button>
-          <button onClick={() => setShowSettings(!showSettings)} className="p-2 text-slate-400 hover:text-white bg-slate-800 rounded-lg transition-colors" title="Mixer & Ajustes">
+          <button onClick={() => setShowSettings(!showSettings)} className="p-2 flex items-center gap-2 text-slate-400 hover:text-white bg-slate-800 rounded-lg transition-colors" title="Mixer & Ajustes">
             <Sliders className="w-4 h-4" />
+            <span className="text-xs font-bold uppercase">Mixer</span>
           </button>
         </div>
       </header>
@@ -483,7 +528,7 @@ export default function RhythmStudio() {
                 <span className="text-sm font-mono text-white font-bold">{tempo}</span>
               </div>
               <input 
-                type="range" min="60" max="180" step="1" value={tempo} 
+                type="range" min="60" max="200" step="1" value={tempo} 
                 onChange={(e) => setTempo(parseInt(e.target.value))}
                 className="w-full accent-amber-500 h-1.5 rounded-lg bg-slate-800"
               />
@@ -529,82 +574,117 @@ export default function RhythmStudio() {
           </div>
         )}
 
-        {/* Visualizador Main */}
-        <div className="relative bg-slate-900 rounded-2xl border border-slate-800/80 overflow-hidden h-16 flex flex-col justify-end p-2 shadow-inner hidden sm:flex">
-          <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
-        </div>
-
         {/* CONTENEDOR DEL SECUENCIADOR */}
         <div className="bg-slate-900 p-2 sm:p-5 rounded-3xl border border-slate-800 shadow-xl overflow-hidden flex flex-col gap-3">
           
-          {/* Opciones Superiores de la Cuadrícula */}
-          <div className="flex justify-between items-center px-1 pb-2 border-b border-slate-800/60 mb-1">
-            <div className="flex gap-1 overflow-x-auto no-scrollbar">
-              {Object.keys(PRESETS).map(key => (
-                <button 
-                  key={key}
-                  onClick={() => loadPreset(key)}
-                  className={`px-3 py-1.5 text-[10px] font-bold rounded-lg whitespace-nowrap transition-all ${
-                    currentPreset === key ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                  }`}
-                >
-                  {PRESETS[key].name}
-                </button>
-              ))}
+          {/* Opciones Superiores: Presets y Paginas */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/60 mb-2">
+            
+            {/* Controles de Páginas (Paginación 1-16, 17-32, etc.) */}
+            <div className="flex items-center gap-2">
+              <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+                {[0, 1, 2, 3].map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1.5 text-xs font-bold font-mono rounded-lg transition-all ${
+                      currentPage === page 
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-inner' 
+                        : 'text-slate-500 hover:text-slate-300 border border-transparent'
+                    }`}
+                  >
+                    {page * 16 + 1}-{page * 16 + 16}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setAutoFollow(!autoFollow)}
+                className={`p-2 rounded-xl border transition-all ${
+                  autoFollow ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-400' : 'bg-slate-950 border-slate-800 text-slate-500'
+                }`}
+                title="Seguir reproducción automáticamente"
+              >
+                <Repeat className="w-4 h-4" />
+              </button>
             </div>
-            <button onClick={clearGrid} className="ml-2 p-1.5 text-slate-500 hover:text-rose-400 bg-slate-800 rounded-lg">
-              <Trash2 className="w-4 h-4" />
-            </button>
+
+            {/* Presets */}
+            <div className="flex items-center justify-between w-full sm:w-auto gap-2">
+              <div className="flex gap-1 overflow-x-auto no-scrollbar">
+                {Object.keys(PRESETS).map(key => (
+                  <button 
+                    key={key}
+                    onClick={() => loadPreset(key)}
+                    className={`px-3 py-1.5 text-[10px] font-bold rounded-lg whitespace-nowrap transition-all ${
+                      currentPreset === key ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                    }`}
+                  >
+                    {PRESETS[key].name}
+                  </button>
+                ))}
+              </div>
+              <button onClick={clearGrid} className="shrink-0 ml-1 p-1.5 text-slate-500 hover:text-rose-400 bg-slate-800 rounded-lg">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
-          {/* Cuadrícula (Scrollable horizontal en móviles pequeños) */}
+          {/* Cuadrícula de 16 pasos de la PÁGINA ACTUAL */}
           <div className="overflow-x-auto pb-4 custom-scrollbar">
             <div className="min-w-[600px] flex flex-col gap-1.5 pt-1">
-              {INSTRUMENTS.map((inst) => (
-                <div key={inst.id} className="flex items-center gap-2">
-                  {/* Label del Instrumento */}
-                  <div 
-                    className={`w-14 sm:w-20 shrink-0 h-10 sm:h-12 rounded-xl border border-slate-800 flex items-center justify-center font-mono font-bold text-[9px] sm:text-[11px] select-none cursor-pointer hover:brightness-125 transition-all ${
-                      mutes[inst.id] ? 'opacity-30 bg-slate-900 text-slate-600' : `${inst.color} text-slate-950`
-                    }`}
-                    onClick={() => { initAudio(); playInstrument(inst.id, audioCtxRef.current?.currentTime || 0); }}
-                  >
-                    {inst.id}
-                  </div>
-                  
-                  {/* Fila de 16 pasos */}
-                  <div className="grid grid-cols-16 gap-1 flex-1">
-                    {drumGrid[inst.id].map((val, step) => {
-                      const isActive = val === 1;
-                      const isPlayhead = activeStep === step;
-                      // Resaltar el inicio de cada tiempo (beat)
-                      const isBeatStart = step % 4 === 0;
+              {INSTRUMENTS.map((inst) => {
+                // Seleccionar solo los 16 pasos de la página actual
+                const pageSteps = drumGrid[inst.id].slice(currentPage * 16, (currentPage + 1) * 16);
 
-                      return (
-                        <button
-                          key={step}
-                          onClick={() => toggleStep(inst.id, step)}
-                          className={`h-10 sm:h-12 rounded-lg sm:rounded-xl border transition-all ${
-                            isActive 
-                              ? `${inst.color} border-transparent shadow-lg ${inst.shadow} scale-105 z-10` 
-                              : `bg-slate-900 hover:bg-slate-800 ${isBeatStart ? 'border-slate-700' : 'border-slate-800/60'}`
-                          } ${isPlayhead ? 'ring-2 ring-white/50 brightness-150' : ''}`}
-                        />
-                      );
-                    })}
+                return (
+                  <div key={inst.id} className="flex items-center gap-2">
+                    {/* Label del Instrumento */}
+                    <div 
+                      className={`w-14 sm:w-20 shrink-0 h-10 sm:h-12 rounded-xl border border-slate-800 flex items-center justify-center font-mono font-bold text-[9px] sm:text-[11px] select-none cursor-pointer hover:brightness-125 transition-all ${
+                        mutes[inst.id] ? 'opacity-30 bg-slate-900 text-slate-600' : `${inst.color} text-slate-950`
+                      }`}
+                      onClick={() => { initAudio(); playInstrument(inst.id, audioCtxRef.current?.currentTime || 0); }}
+                    >
+                      {inst.id}
+                    </div>
+                    
+                    {/* Fila de 16 pasos visualizados */}
+                    <div className="grid grid-cols-16 gap-1 flex-1">
+                      {pageSteps.map((val, stepInPage) => {
+                        const globalIndex = currentPage * 16 + stepInPage;
+                        const isActive = val === 1;
+                        const isPlayhead = activeStep === globalIndex;
+                        const isBeatStart = stepInPage % 4 === 0;
+
+                        return (
+                          <button
+                            key={stepInPage}
+                            onClick={() => toggleStep(inst.id, stepInPage)}
+                            className={`h-10 sm:h-12 rounded-lg sm:rounded-xl border transition-all ${
+                              isActive 
+                                ? `${inst.color} border-transparent shadow-lg ${inst.shadow} scale-105 z-10` 
+                                : `bg-slate-900 hover:bg-slate-800 ${isBeatStart ? 'border-slate-700' : 'border-slate-800/60'}`
+                            } ${isPlayhead ? 'ring-2 ring-white/50 brightness-150' : ''}`}
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               {/* Playhead Indicator (Abajo) */}
               <div className="flex items-center gap-2 mt-1">
                 <div className="w-14 sm:w-20 shrink-0" />
                 <div className="grid grid-cols-16 gap-1 flex-1">
-                  {Array.from({ length: 16 }).map((_, step) => (
-                    <div key={step} className="flex justify-center">
-                      <div className={`w-1.5 h-1.5 rounded-full transition-all ${activeStep === step ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)] scale-150' : 'bg-slate-800'}`} />
-                    </div>
-                  ))}
+                  {Array.from({ length: 16 }).map((_, stepInPage) => {
+                    const globalIndex = currentPage * 16 + stepInPage;
+                    return (
+                      <div key={stepInPage} className="flex justify-center">
+                        <div className={`w-1.5 h-1.5 rounded-full transition-all ${activeStep === globalIndex ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)] scale-150' : 'bg-slate-800'}`} />
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
 
