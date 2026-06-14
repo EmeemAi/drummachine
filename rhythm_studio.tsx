@@ -1,172 +1,140 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-  Play, Square, Volume2, VolumeX, Settings, 
-  Trash2, Sliders, Cpu, Save, FolderOpen, 
-  Download, Activity, ArrowRight, Minus, Plus, Repeat, Layers,
-  Radio, Zap
-} from 'lucide-react';
+import { Play, Save, Settings, Activity } from 'lucide-react';
 
-// Utilidad para repetir patrones de 16 pasos 4 veces
+// Utilities
 const rep16 = (arr) => [...arr, ...arr, ...arr, ...arr];
 
-// Instrumentos y sus colores
 const INSTRUMENTS = [
-  { id: 'BD', name: 'KICK', color: 'bg-rose-500', shadow: 'shadow-rose-500', text: 'text-rose-500' },
-  { id: 'SD', name: 'SNARE', color: 'bg-amber-500', shadow: 'shadow-amber-500', text: 'text-amber-500' },
-  { id: 'CP', name: 'CLAP', color: 'bg-orange-400', shadow: 'shadow-orange-400', text: 'text-orange-400' },
-  { id: 'CH', name: 'C. HAT', color: 'bg-yellow-400', shadow: 'shadow-yellow-400', text: 'text-yellow-400' },
-  { id: 'OH', name: 'O. HAT', color: 'bg-lime-400', shadow: 'shadow-lime-400', text: 'text-lime-400' },
-  { id: 'TM', name: 'TOM', color: 'bg-cyan-400', shadow: 'shadow-cyan-400', text: 'text-cyan-400' },
-  { id: 'CB', name: 'COWBELL', color: 'bg-indigo-400', shadow: 'shadow-indigo-400', text: 'text-indigo-400' }
+  { id: 'BD', name: 'KICK', capColor: 'bg-rose-600', shadow: 'shadow-rose-500' },
+  { id: 'SD', name: 'SNARE', capColor: 'bg-[#5c4a3d]', shadow: 'shadow-amber-500' },
+  { id: 'CP', name: 'CLAP', capColor: 'bg-orange-600', shadow: 'shadow-orange-400' },
+  { id: 'CH', name: 'C. HAT', capColor: 'bg-yellow-500', shadow: 'shadow-yellow-400' },
+  { id: 'OH', name: 'O. HAT', capColor: 'bg-[#6b705c]', shadow: 'shadow-lime-400' },
+  { id: 'TM', name: 'TOM', capColor: 'bg-blue-600', shadow: 'shadow-cyan-400' },
+  { id: 'CB', name: 'COWBELL', capColor: 'bg-[#6b5b95]', shadow: 'shadow-indigo-400' }
 ];
 
 const PRESETS = {
   vacio: {
-    name: 'Vacío',
-    length: 1,
-    grid: {
-      BD: Array(64).fill(0), SD: Array(64).fill(0), CP: Array(64).fill(0),
-      CH: Array(64).fill(0), OH: Array(64).fill(0), TM: Array(64).fill(0), CB: Array(64).fill(0)
-    }
+    name: 'VACÍO', length: 1,
+    grid: { BD: Array(64).fill(0), SD: Array(64).fill(0), CP: Array(64).fill(0), CH: Array(64).fill(0), OH: Array(64).fill(0), TM: Array(64).fill(0), CB: Array(64).fill(0) }
   },
   house: {
-    name: 'Classic House',
-    length: 1,
+    name: 'CLASSIC HOUSE', length: 1,
     grid: {
-      BD: rep16([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]),
-      SD: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-      CP: rep16([0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]),
-      CH: rep16([0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0]),
-      OH: rep16([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]),
-      TM: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-      CB: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+      BD: rep16([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]), SD: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), CP: rep16([0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]),
+      CH: rep16([0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0]), OH: rep16([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]), TM: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), CB: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     }
   },
   trap: {
-    name: 'Trap',
-    length: 2,
+    name: 'TRAP', length: 2,
     grid: {
-      BD: rep16([1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0]),
-      SD: rep16([0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]),
-      CP: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-      CH: rep16([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
-      OH: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-      TM: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-      CB: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+      BD: rep16([1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0]), SD: rep16([0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]), CP: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      CH: rep16([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]), OH: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), TM: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), CB: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     }
   },
   reggaeton: {
-    name: 'Dembow',
-    length: 1,
+    name: 'DEMBOW', length: 1,
     grid: {
-      BD: rep16([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]),
-      SD: rep16([0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0]),
-      CP: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-      CH: rep16([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]),
-      OH: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-      TM: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-      CB: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-    }
-  },
-  techno: {
-    name: 'Techno',
-    length: 4,
-    grid: {
-      BD: rep16([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]),
-      SD: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-      CP: rep16([0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]),
-      CH: rep16([0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0]),
-      OH: rep16([0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0]),
-      TM: [
-        ...[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        ...[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
-        ...[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        ...[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0]
-      ],
-      CB: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-    }
-  },
-  hiphop: {
-    name: 'Hip Hop',
-    length: 4,
-    grid: {
-      BD: [
-        ...[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-        ...[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0],
-        ...[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-        ...[1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0]
-      ],
-      SD: rep16([0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]),
-      CP: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-      CH: rep16([1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]),
-      OH: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
-      TM: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-      CB: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-    }
-  },
-  dnb: {
-    name: 'Drum & Bass',
-    length: 2,
-    grid: {
-      BD: rep16([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0]),
-      SD: rep16([0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]),
-      CP: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-      CH: rep16([1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]),
-      OH: rep16([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]),
-      TM: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-      CB: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+      BD: rep16([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]), SD: rep16([0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0]), CP: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      CH: rep16([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]), OH: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), TM: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), CB: rep16([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     }
   }
 };
 
+// Componente Perilla (Knob)
+const RotaryKnob = ({ value, min, max, onChange, size = 50, isMetallic = false }) => {
+  const knobRef = useRef(null);
+  
+  const handlePointerDown = (e) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startVal = value;
+    
+    const handlePointerMove = (moveEvent) => {
+      const deltaY = startY - moveEvent.clientY;
+      const range = max - min;
+      let newVal = startVal + (deltaY / 150) * range;
+      newVal = Math.max(min, Math.min(max, newVal));
+      onChange(newVal);
+    };
+    
+    const handlePointerUp = () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+    
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+  };
+
+  const percent = (value - min) / (max - min);
+  const angle = -135 + (percent * 270);
+
+  return (
+    <div className="flex flex-col items-center justify-center relative">
+      <div 
+        ref={knobRef}
+        onPointerDown={handlePointerDown}
+        className={`rounded-full shadow-[0_8px_15px_rgba(0,0,0,0.8),inset_0_2px_4px_rgba(255,255,255,0.2)] cursor-ns-resize border-2 border-black/40 ${isMetallic ? 'bg-gradient-to-br from-[#f0f0f0] via-[#a0a0a0] to-[#555]' : 'bg-gradient-to-br from-[#5c4a3d] to-[#2a1d13]'}`}
+        style={{ width: size, height: size, touchAction: 'none' }}
+      >
+        <div 
+          className="absolute top-0 left-0 w-full h-full"
+          style={{ transform: `rotate(${angle}deg)` }}
+        >
+          {/* Indicador */}
+          <div className={`mx-auto mt-[4px] w-1.5 h-3.5 rounded-full ${isMetallic ? 'bg-[#111] shadow-inner' : 'bg-[#eab308] shadow-[0_0_6px_rgba(234,179,8,0.6)]'}`}></div>
+        </div>
+        
+        {/* Relieve circular central para dar más realismo 3D */}
+        <div className="absolute inset-[20%] rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),0_1px_2px_rgba(255,255,255,0.1)] pointer-events-none"></div>
+      </div>
+    </div>
+  );
+};
+
 export default function RhythmStudio() {
   useEffect(() => {
+    // Fuentes: DSEG para el LCD, Inter para UI
     const link = document.createElement('link');
-    link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap';
+    link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Share+Tech+Mono&display=swap';
     link.rel = 'stylesheet';
     document.head.appendChild(link);
     return () => document.head.removeChild(link);
   }, []);
 
-  // Estado Principal
   const [isPlaying, setIsPlaying] = useState(false);
-  const [tempo, setTempo] = useState(120);
+  const [tempo, setTempo] = useState(155);
   const [swing, setSwing] = useState(0); 
-  const [masterVolume, setMasterVolume] = useState(0.8);
   const [activeStep, setActiveStep] = useState(-1);
   const [currentPreset, setCurrentPreset] = useState('vacio');
-  const [showSettings, setShowSettings] = useState(false);
+  const [showMixer, setShowMixer] = useState(true); // Siempre visible en escritorio, togglable en móvil opcionalmente. El mockup lo muestra todo.
 
   const [currentPage, setCurrentPage] = useState(0); 
   const [autoFollow, setAutoFollow] = useState(true);
   const [patternLength, setPatternLength] = useState(1);
 
-  const [drumGrid, setDrumGrid] = useState(PRESETS.vacio.grid);
+  const [drumGrid, setDrumGrid] = useState(PRESETS.house.grid);
 
-  // Mixer: Volumen, Mute y Pitch individual
+  // Mixer
   const [volumes, setVolumes] = useState({ BD: 0.9, SD: 0.8, CP: 0.7, CH: 0.6, OH: 0.6, TM: 0.8, CB: 0.5 });
   const [mutes, setMutes] = useState({ BD: false, SD: false, CP: false, CH: false, OH: false, TM: false, CB: false });
   const [pitches, setPitches] = useState({ BD: 1.0, SD: 1.0, CP: 1.0, CH: 1.0, OH: 1.0, TM: 1.0, CB: 1.0 });
 
   // Efectos Master
-  const [masterDrive, setMasterDrive] = useState(0); // 0 a 1
-  const [masterReverb, setMasterReverb] = useState(0); // 0 a 1
+  const [masterDrive, setMasterDrive] = useState(0.2); // El mockup muestra algo de drive
+  const [masterReverb, setMasterReverb] = useState(0.3);
 
-  // Referencias de Web Audio
+  // Referencias de Audio
   const audioCtxRef = useRef(null);
   const masterGainRef = useRef(null);
   const noiseBufferRef = useRef(null);
-  const analyserRef = useRef(null);
-  const canvasRef = useRef(null);
-  const animationFrameRef = useRef(null);
-
-  // Referencias de Nodos de Efectos
   const cleanGainRef = useRef(null);
   const driveGainRef = useRef(null);
   const wetReverbGainRef = useRef(null);
   const dryReverbGainRef = useRef(null);
 
-  // Referencias mutables para el secuenciador
   const drumGridRef = useRef(drumGrid);
   const tempoRef = useRef(tempo);
   const swingRef = useRef(swing);
@@ -202,7 +170,7 @@ export default function RhythmStudio() {
     }
   }, [activeStep, autoFollow, currentPage, patternLength]);
 
-  // Inicialización de Audio
+  // Motor de Audio
   const initAudio = () => {
     if (!audioCtxRef.current) {
       try {
@@ -218,18 +186,16 @@ export default function RhythmStudio() {
         }
         noiseBufferRef.current = buffer;
 
-        // Estructura de Efectos
         const masterGain = ctx.createGain();
         masterGainRef.current = masterGain;
 
-        // Drive (Distorsión)
         const cleanGain = ctx.createGain();
         const driveGain = ctx.createGain();
         cleanGainRef.current = cleanGain;
         driveGainRef.current = driveGain;
 
         const waveShaper = ctx.createWaveShaper();
-        const k = 400; // Intensidad máxima de la curva
+        const k = 400; 
         const n_samples = 44100;
         const curve = new Float32Array(n_samples);
         const deg = Math.PI / 180;
@@ -244,24 +210,22 @@ export default function RhythmStudio() {
         masterGain.connect(waveShaper);
         waveShaper.connect(driveGain);
 
-        // Suma de distorsión
         const preReverbNode = ctx.createGain();
         cleanGain.connect(preReverbNode);
         driveGain.connect(preReverbNode);
 
-        // Reverb (Salón)
         const dryReverbGain = ctx.createGain();
         const wetReverbGain = ctx.createGain();
         dryReverbGainRef.current = dryReverbGain;
         wetReverbGainRef.current = wetReverbGain;
 
         const convolver = ctx.createConvolver();
-        const rvLength = ctx.sampleRate * 2.5; // 2.5 segundos de cola
+        const rvLength = ctx.sampleRate * 2.5; 
         const impulse = ctx.createBuffer(2, rvLength, ctx.sampleRate);
         const left = impulse.getChannelData(0);
         const right = impulse.getChannelData(1);
         for (let i = 0; i < rvLength; i++) {
-          const decay = Math.exp(-i / (ctx.sampleRate * 0.4)); // decaimiento exponencial
+          const decay = Math.exp(-i / (ctx.sampleRate * 0.4)); 
           left[i] = (Math.random() * 2 - 1) * decay;
           right[i] = (Math.random() * 2 - 1) * decay;
         }
@@ -271,36 +235,26 @@ export default function RhythmStudio() {
         preReverbNode.connect(convolver);
         convolver.connect(wetReverbGain);
 
-        // Analizador final
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 64;
-        analyserRef.current = analyser;
+        dryReverbGain.connect(ctx.destination);
+        wetReverbGain.connect(ctx.destination);
 
-        dryReverbGain.connect(analyser);
-        wetReverbGain.connect(analyser);
-        analyser.connect(ctx.destination);
-
-        // Ajustar volúmenes iniciales
-        masterGain.gain.value = masterVolume;
+        masterGain.gain.value = 1.0;
         cleanGain.gain.value = 1;
         driveGain.gain.value = 0;
         dryReverbGain.gain.value = 1;
         wetReverbGain.gain.value = 0;
 
       } catch (e) {
-        console.error("Error al inicializar audio:", e);
+        console.error("Audio init error:", e);
       }
     }
-    
     if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
       audioCtxRef.current.resume();
     }
   };
 
-  // Efectos UI -> Nodos
   useEffect(() => {
     if (cleanGainRef.current && driveGainRef.current) {
-      // Crossfade de Drive
       cleanGainRef.current.gain.setTargetAtTime(1 - masterDrive, audioCtxRef.current.currentTime, 0.05);
       driveGainRef.current.gain.setTargetAtTime(masterDrive, audioCtxRef.current.currentTime, 0.05);
     }
@@ -309,37 +263,9 @@ export default function RhythmStudio() {
   useEffect(() => {
     if (wetReverbGainRef.current && dryReverbGainRef.current) {
       wetReverbGainRef.current.gain.setTargetAtTime(masterReverb, audioCtxRef.current.currentTime, 0.05);
-      // Bajamos un poco la señal original seca si hay mucha reverb para compensar volumen
       dryReverbGainRef.current.gain.setTargetAtTime(1 - (masterReverb * 0.3), audioCtxRef.current.currentTime, 0.05);
     }
   }, [masterReverb]);
-
-  useEffect(() => {
-    if (masterGainRef.current && audioCtxRef.current) {
-      masterGainRef.current.gain.setTargetAtTime(masterVolume, audioCtxRef.current.currentTime, 0.05);
-    }
-  }, [masterVolume]);
-
-  useEffect(() => {
-    const savedState = localStorage.getItem('rhythm_studio_v3');
-    if (savedState) {
-      try {
-        const state = JSON.parse(savedState);
-        if (state.grid) setDrumGrid(state.grid);
-        if (state.tempo) setTempo(state.tempo);
-        if (state.volumes) setVolumes(state.volumes);
-        if (state.pitches) setPitches(state.pitches);
-        if (state.patternLength) setPatternLength(state.patternLength);
-        if (state.masterDrive !== undefined) setMasterDrive(state.masterDrive);
-        if (state.masterReverb !== undefined) setMasterReverb(state.masterReverb);
-      } catch (e) {}
-    }
-  }, []);
-
-  const saveStateLocally = () => {
-    const state = { grid: drumGrid, tempo, volumes, pitches, patternLength, masterDrive, masterReverb };
-    localStorage.setItem('rhythm_studio_v3', JSON.stringify(state));
-  };
 
   const playInstrument = (inst, time) => {
     if (mutesRef.current[inst]) return;
@@ -352,7 +278,6 @@ export default function RhythmStudio() {
     instGain.gain.setValueAtTime(vol, time);
     instGain.connect(masterGainRef.current);
 
-    // Limitador de frecuencia para evitar errores de Web Audio API
     const safeFreq = (f) => Math.min(f, ctx.sampleRate / 2);
 
     if (inst === 'BD') {
@@ -517,7 +442,6 @@ export default function RhythmStudio() {
   const toggleStep = (inst, indexInPage) => {
     initAudio();
     const globalIndex = currentPage * 16 + indexInPage;
-
     setDrumGrid(prev => {
       const copy = { ...prev };
       const row = [...copy[inst]];
@@ -534,392 +458,325 @@ export default function RhythmStudio() {
     setCurrentPage(0);
   };
 
-  const clearGrid = () => loadPreset('vacio');
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let width = canvas.width = canvas.parentElement.clientWidth;
-    let height = canvas.height = canvas.parentElement.clientHeight || 80;
-
-    const render = () => {
-      ctx.clearRect(0, 0, width, height);
-
-      if (analyserRef.current && isPlaying) {
-        const bufferLength = analyserRef.current.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
-        analyserRef.current.getByteFrequencyData(dataArray);
-
-        const barWidth = (width / bufferLength) * 2;
-        let x = 0;
-
-        for (let i = 0; i < bufferLength; i++) {
-          const barHeight = dataArray[i];
-          const percent = barHeight / 255;
-          ctx.fillStyle = `rgba(16, 185, 129, ${percent * 0.5})`;
-          ctx.fillRect(x, height - (barHeight * (height / 255)), barWidth - 1, barHeight * (height / 255));
-          x += barWidth;
-        }
-      }
-      animationFrameRef.current = requestAnimationFrame(render);
-    };
-
-    render();
-    return () => cancelAnimationFrame(animationFrameRef.current);
-  }, [isPlaying]);
+  // UI Components Extras
+  const PhysicalButton = ({ children, onClick, active, className="" }) => (
+    <button 
+      onClick={onClick}
+      className={`relative rounded flex items-center justify-center font-bold transition-all
+        ${active 
+          ? 'bg-[#1e1a17] text-[#eab308] translate-y-[2px] shadow-none border-t border-black/80' 
+          : 'bg-[#3b352d] text-[#a8a090] shadow-[0_4px_0_#1a1613] hover:brightness-110 -translate-y-[1px]'} 
+        ${className}`}
+    >
+      {children}
+    </button>
+  );
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black text-slate-100 flex flex-col select-none antialiased" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div className="min-h-screen bg-[#111] flex justify-center py-0 sm:py-6" style={{ fontFamily: "'Inter', sans-serif" }}>
       
-      {/* HEADER GLASSMORPHISM */}
-      <header className="border-b border-white/5 bg-slate-900/60 backdrop-blur-xl sticky top-0 z-50 px-4 py-3 shadow-[0_4px_30px_rgba(0,0,0,0.3)]">
-        <div className="max-w-6xl w-full mx-auto flex flex-wrap justify-between items-center gap-3">
-          <div className="flex items-center gap-3">
-            <div className="bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/30 text-amber-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
-              <Activity className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
-                Rhythm Studio <span className="text-[10px] uppercase tracking-widest text-emerald-400 font-mono bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]">Pro FX</span>
+      {/* Contenedor Principal con Bordes de Madera */}
+      <div className="w-full max-w-[500px] bg-gradient-to-b from-[#4a483e] via-[#3a382e] to-[#2b2a22] sm:rounded-xl shadow-2xl relative overflow-hidden border-l-[12px] border-r-[12px] border-[#2b1d14]">
+        
+        {/* Tornillos decorativos */}
+        <div className="absolute top-3 left-3 w-3 h-3 rounded-full bg-gradient-to-br from-[#888] to-[#444] shadow-sm border border-[#222]">
+          <div className="absolute inset-[3px] rotate-45 border-t border-[#222]"></div>
+        </div>
+        <div className="absolute top-3 right-3 w-3 h-3 rounded-full bg-gradient-to-br from-[#888] to-[#444] shadow-sm border border-[#222]">
+           <div className="absolute inset-[3px] -rotate-12 border-t border-[#222]"></div>
+        </div>
+        <div className="absolute bottom-3 left-3 w-3 h-3 rounded-full bg-gradient-to-br from-[#888] to-[#444] shadow-sm border border-[#222]">
+           <div className="absolute inset-[3px] rotate-90 border-t border-[#222]"></div>
+        </div>
+        <div className="absolute bottom-3 right-3 w-3 h-3 rounded-full bg-gradient-to-br from-[#888] to-[#444] shadow-sm border border-[#222]">
+           <div className="absolute inset-[3px] rotate-12 border-t border-[#222]"></div>
+        </div>
+
+        {/* HEADER */}
+        <div className="px-6 py-5 border-b-2 border-[#222] shadow-[0_4px_10px_rgba(0,0,0,0.3)]">
+          <div className="flex justify-between items-start mb-4">
+            <div className="flex items-center gap-2 text-[#d4d0c5]">
+              <Activity className="w-8 h-8 opacity-70" />
+              <h1 className="text-2xl font-black tracking-tight drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
+                Rhythm Studio
               </h1>
             </div>
+            
+            {/* Pantalla PRO FX */}
+            <div className="bg-[#1a1205] border-2 border-black/80 rounded px-3 py-1 shadow-[inset_0_2px_8px_rgba(0,0,0,1)]">
+              <span className="font-['Share_Tech_Mono'] text-xl text-[#ffaa00] drop-shadow-[0_0_8px_rgba(255,170,0,0.6)]">PRO FX</span>
+            </div>
           </div>
 
-          <div className="flex gap-2">
-            <button onClick={() => saveStateLocally()} className="p-2.5 flex items-center gap-2 text-slate-400 hover:text-white bg-slate-800/80 rounded-xl border border-white/5 shadow-lg transition-all hover:bg-slate-700" title="Guardar Canción">
-              <Save className="w-4 h-4" />
-              <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">Save</span>
-            </button>
-            <button onClick={() => setShowSettings(!showSettings)} className={`p-2.5 flex items-center gap-2 rounded-xl border transition-all shadow-lg ${showSettings ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-400' : 'bg-slate-800/80 border-white/5 text-slate-400 hover:bg-slate-700 hover:text-white'}`}>
-              <Sliders className="w-4 h-4" />
-              <span className="text-xs font-bold uppercase tracking-wider">Mixer & FX</span>
-            </button>
+          <div className="flex gap-4">
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] font-bold text-[#b8b29c] mb-1">SAVE</span>
+              <PhysicalButton className="w-16 h-6 rounded-md bg-[#222] shadow-[0_3px_0_#000] text-transparent">.</PhysicalButton>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] font-bold text-[#b8b29c] mb-1">MIXER & FX</span>
+              <PhysicalButton onClick={() => setShowMixer(!showMixer)} active={showMixer} className="w-24 h-6 rounded-md bg-[#222] shadow-[0_3px_0_#000] text-transparent">.</PhysicalButton>
+            </div>
           </div>
         </div>
-      </header>
 
-      {/* MAIN CONTENT */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-2 sm:p-5 flex flex-col gap-5">
-        
-        {/* PANEL SUPERIOR: CONTROLES DE TRANSPORTE Y MIXER */}
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+        {/* TRANSPORT & TEMPO SECTION */}
+        <div className="px-6 py-5 border-b-2 border-[#222] flex justify-between items-end shadow-[0_4px_10px_rgba(0,0,0,0.2)]">
           
-          {/* Transporte y Tempo */}
-          <div className="xl:col-span-4 bg-slate-800/40 backdrop-blur-md p-5 rounded-3xl border border-white/10 flex flex-col gap-5 shadow-2xl relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-50 pointer-events-none"></div>
-            
-            <div className="flex items-center gap-4 relative z-10">
-              <button
-                onClick={togglePlay}
-                className={`w-16 h-16 shrink-0 rounded-2xl flex items-center justify-center shadow-xl transition-all duration-300 border border-white/10 ${
-                  isPlaying 
-                    ? 'bg-gradient-to-b from-rose-500 to-rose-700 hover:from-rose-400 hover:to-rose-600 shadow-[0_0_20px_rgba(244,63,94,0.4)] shadow-rose-900/50 scale-95' 
-                    : 'bg-gradient-to-b from-emerald-500 to-emerald-700 hover:from-emerald-400 hover:to-emerald-600 shadow-emerald-900/50'
-                }`}
-              >
-                {isPlaying ? <Square className="w-6 h-6 fill-white text-white shadow-sm" /> : <Play className="w-7 h-7 fill-white text-white ml-1 shadow-sm" />}
-              </button>
-
-              <div className="flex flex-col flex-1 gap-1">
-                <div className="flex justify-between items-center bg-black/30 px-3 py-1.5 rounded-lg border border-white/5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tempo</span>
-                  <span className="text-sm font-mono text-white font-bold">{tempo} <span className="text-slate-500 text-[10px]">BPM</span></span>
-                </div>
-                <input 
-                  type="range" min="60" max="200" step="1" value={tempo} 
-                  onChange={(e) => setTempo(parseInt(e.target.value))}
-                  className="w-full accent-amber-500 h-2 mt-2 rounded-full bg-slate-900/80 cursor-pointer shadow-inner border border-white/5"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1 relative z-10">
-               <div className="flex justify-between items-center px-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Swing (Groove)</span>
-                  <span className="text-[10px] font-mono text-emerald-400">{Math.round(swing * 100)}%</span>
-                </div>
-                <input 
-                  type="range" min="0" max="0.5" step="0.05" value={swing} 
-                  onChange={(e) => setSwing(parseFloat(e.target.value))}
-                  className="w-full accent-emerald-500 h-2 mt-1 rounded-full bg-slate-900/80 cursor-pointer shadow-inner border border-white/5"
-                />
-            </div>
+          <div className="flex flex-col items-center gap-2">
+            <button
+              onClick={togglePlay}
+              className={`w-16 h-16 rounded-lg flex items-center justify-center border-2 border-black/50 transition-all ${
+                isPlaying 
+                  ? 'bg-[#1a1a1a] shadow-[inset_0_4px_8px_rgba(0,0,0,0.8)] translate-y-[2px]' 
+                  : 'bg-[#2a2a2a] shadow-[0_6px_0_#111,inset_0_2px_2px_rgba(255,255,255,0.1)]'
+              }`}
+            >
+              <div className={`w-0 h-0 border-t-[12px] border-t-transparent border-l-[20px] border-b-[12px] border-b-transparent transition-colors ${isPlaying ? 'border-l-[#eab308] drop-shadow-[0_0_8px_rgba(234,179,8,0.8)]' : 'border-l-[#16a34a] opacity-80'}`}></div>
+            </button>
+            <span className="text-[11px] font-bold text-[#b8b29c] tracking-widest mt-1">PLAY</span>
           </div>
 
-          {/* Mixer + Master FX (Visible Condicionalmente) o Visualizador */}
-          {showSettings ? (
-            <div className="xl:col-span-8 bg-slate-800/40 backdrop-blur-md p-4 rounded-3xl border border-white/10 flex flex-col md:flex-row gap-4 shadow-2xl relative">
-              
-              {/* Instrument Mixer */}
-              <div className="flex-1 grid grid-cols-4 sm:grid-cols-7 gap-2">
-                {INSTRUMENTS.map(inst => (
-                  <div key={inst.id} className="bg-black/40 p-2 rounded-2xl border border-white/5 flex flex-col items-center gap-2 shadow-inner">
-                    <span className={`text-[9px] font-bold font-mono tracking-widest ${inst.text}`}>{inst.id}</span>
+          <div className="flex flex-col items-center">
+            <RotaryKnob value={tempo} min={60} max={200} onChange={setTempo} size={60} />
+            <div className="flex justify-between w-full px-2 mt-1">
+              <span className="text-[8px] text-[#888] font-bold">60</span>
+              <span className="text-[8px] text-[#888] font-bold">200</span>
+            </div>
+            <span className="text-[11px] font-bold text-[#b8b29c] tracking-widest mt-1">TEMPO</span>
+          </div>
+
+          {/* LCD TEMPO */}
+          <div className="bg-[#1a1205] border-2 border-black/80 rounded-md px-4 py-2 shadow-[inset_0_2px_8px_rgba(0,0,0,1)] mb-6">
+            <span className="font-['Share_Tech_Mono'] text-3xl text-[#ffaa00] drop-shadow-[0_0_8px_rgba(255,170,0,0.6)]">{tempo}</span>
+            <span className="font-['Share_Tech_Mono'] text-sm text-[#ffaa00]/70 ml-1">BPM</span>
+          </div>
+
+          <div className="flex flex-col items-center">
+            <RotaryKnob value={swing} min={0} max={0.5} onChange={setSwing} size={60} />
+            <div className="flex justify-between w-full px-2 mt-1">
+              <span className="text-[8px] text-[#888] font-bold">0</span>
+              <span className="text-[8px] text-[#888] font-bold">MAX</span>
+            </div>
+            <span className="text-[11px] font-bold text-[#b8b29c] tracking-widest mt-1">SWING</span>
+          </div>
+
+        </div>
+
+        {/* SEQUENCER SECTION */}
+        <div className="px-3 sm:px-6 py-5 border-b-2 border-[#222]">
+          
+          {/* Presets Row */}
+          <div className="flex flex-wrap gap-2 mb-3">
+            {Object.keys(PRESETS).map(key => (
+              <PhysicalButton 
+                key={key} onClick={() => loadPreset(key)} active={currentPreset === key}
+                className="px-3 py-1.5 text-[10px]"
+              >
+                {PRESETS[key].name}
+              </PhysicalButton>
+            ))}
+          </div>
+
+          {/* Length & Pages Row */}
+          <div className="flex flex-wrap gap-2 mb-5">
+            {[1, 2, 3, 4].map(len => (
+              <PhysicalButton 
+                key={len} onClick={() => setPatternLength(len)} active={patternLength === len}
+                className="px-3 py-1.5 text-[10px]"
+              >
+                {len} Bar{len>1?'s':''}
+              </PhysicalButton>
+            ))}
+            <div className="w-px bg-black/40 mx-1"></div>
+            {Array.from({ length: patternLength }).map((_, page) => (
+              <PhysicalButton 
+                key={page} onClick={() => setCurrentPage(page)} active={currentPage === page}
+                className="px-3 py-1.5 text-[10px]"
+              >
+                {page * 16 + 1}-{page * 16 + 16}
+              </PhysicalButton>
+            ))}
+          </div>
+
+          {/* THE GRID */}
+          <div className="flex flex-col gap-3">
+            {INSTRUMENTS.map((inst) => {
+              const pageSteps = drumGrid[inst.id].slice(currentPage * 16, (currentPage + 1) * 16);
+
+              return (
+                <div key={inst.id} className="flex items-center gap-2 sm:gap-3">
+                  {/* Etiqueta / Preview (Boton Marrón) */}
+                  <div className="flex flex-col items-center gap-1 w-8 sm:w-10 shrink-0">
+                    <span className="text-[10px] font-bold text-[#b8b29c]">{inst.id}</span>
                     <button 
-                      onClick={() => setMutes(prev => ({...prev, [inst.id]: !prev[inst.id]}))}
-                      className={`w-full py-1.5 rounded-lg flex justify-center transition-all border ${mutes[inst.id] ? 'bg-rose-500/20 border-rose-500/30 text-rose-500 shadow-[inset_0_0_8px_rgba(244,63,94,0.3)]' : 'bg-slate-800/50 border-white/5 text-slate-400 hover:bg-slate-700'}`}
-                    >
-                      {mutes[inst.id] ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
-                    </button>
-                    
-                    {/* Controles de Rueda / Fader */}
-                    <div className="flex flex-col items-center w-full gap-2 mt-1">
-                      {/* Pitch */}
-                      <div className="flex flex-col items-center gap-1 w-full" title="Pitch (Afinación)">
-                        <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Pitch</span>
-                        <input 
-                          type="range" min="0.5" max="2" step="0.05" value={pitches[inst.id]} 
-                          onChange={(e) => setPitches(prev => ({...prev, [inst.id]: parseFloat(e.target.value)}))}
-                          className={`w-full h-1 accent-indigo-400 cursor-pointer bg-slate-800 rounded-full`}
-                        />
-                      </div>
-                      
-                      {/* Volumen Vertical */}
-                      <div className="flex flex-col items-center gap-1 w-full mt-2" title="Volumen">
-                        <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Vol</span>
-                        <input 
-                          type="range" min="0" max="1" step="0.05" value={volumes[inst.id]} 
-                          onChange={(e) => setVolumes(prev => ({...prev, [inst.id]: parseFloat(e.target.value)}))}
-                          className={`h-12 w-2 accent-${inst.color.replace('bg-', '')} cursor-pointer`}
-                          style={{ writingMode: 'bt-lr', WebkitAppearance: 'slider-vertical' }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Separador */}
-              <div className="w-px bg-white/10 hidden md:block"></div>
-
-              {/* Master FX Panel */}
-              <div className="bg-black/40 p-3 rounded-2xl border border-white/5 flex md:flex-col gap-4 shadow-inner min-w-[120px] justify-around">
-                <div className="text-center w-full">
-                  <span className="text-[9px] font-bold text-white uppercase tracking-widest bg-white/10 px-2 py-0.5 rounded-full">Master FX</span>
-                </div>
-                
-                {/* Drive Knob */}
-                <div className="flex flex-col items-center gap-1 flex-1">
-                  <div className={`p-1.5 rounded-full ${masterDrive > 0 ? 'bg-orange-500/20 text-orange-400 shadow-[0_0_10px_rgba(249,115,22,0.3)]' : 'bg-slate-800 text-slate-500'}`}>
-                    <Zap className="w-4 h-4" />
-                  </div>
-                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">Drive</span>
-                  <input 
-                    type="range" min="0" max="1" step="0.05" value={masterDrive} 
-                    onChange={(e) => setMasterDrive(parseFloat(e.target.value))}
-                    className="w-full md:w-2 md:h-12 accent-orange-500 mt-1 cursor-pointer"
-                    style={{ writingMode: 'bt-lr', WebkitAppearance: 'slider-vertical' }}
-                  />
-                </div>
-
-                {/* Reverb Knob */}
-                <div className="flex flex-col items-center gap-1 flex-1">
-                  <div className={`p-1.5 rounded-full ${masterReverb > 0 ? 'bg-cyan-500/20 text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.3)]' : 'bg-slate-800 text-slate-500'}`}>
-                    <Radio className="w-4 h-4" />
-                  </div>
-                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">Reverb</span>
-                  <input 
-                    type="range" min="0" max="1" step="0.05" value={masterReverb} 
-                    onChange={(e) => setMasterReverb(parseFloat(e.target.value))}
-                    className="w-full md:w-2 md:h-12 accent-cyan-500 mt-1 cursor-pointer"
-                    style={{ writingMode: 'bt-lr', WebkitAppearance: 'slider-vertical' }}
-                  />
-                </div>
-              </div>
-
-            </div>
-          ) : (
-            <div className="xl:col-span-8 bg-slate-800/40 backdrop-blur-md rounded-3xl border border-white/10 flex flex-col justify-end p-3 shadow-2xl overflow-hidden relative min-h-[100px]">
-              <div className="absolute top-4 left-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest z-10 flex items-center gap-2">
-                 <Activity className="w-3 h-3" /> Master Output
-              </div>
-              <canvas ref={canvasRef} className="absolute inset-0 w-full h-full opacity-60" />
-            </div>
-          )}
-
-        </div>
-
-        {/* CONTENEDOR DEL SECUENCIADOR */}
-        <div className="bg-slate-800/30 backdrop-blur-md p-3 sm:p-6 rounded-3xl border border-white/10 shadow-2xl flex flex-col gap-4 relative overflow-hidden">
-          
-          <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none"></div>
-
-          {/* Opciones Superiores de Patrón */}
-          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-4 border-b border-white/5 relative z-10">
-            
-            {/* Presets */}
-            <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1 w-full xl:w-auto">
-              {Object.keys(PRESETS).map(key => (
-                <button 
-                  key={key}
-                  onClick={() => loadPreset(key)}
-                  className={`px-4 py-2 text-[11px] font-bold uppercase tracking-wider rounded-xl whitespace-nowrap transition-all border shadow-sm ${
-                    currentPreset === key 
-                      ? 'bg-gradient-to-b from-indigo-500 to-indigo-600 border-indigo-400/50 text-white shadow-indigo-500/20' 
-                      : 'bg-black/30 border-white/5 text-slate-400 hover:bg-slate-800 hover:text-white'
-                  }`}
-                >
-                  {PRESETS[key].name}
-                </button>
-              ))}
-              <div className="w-px h-6 bg-white/10 mx-1 shrink-0"></div>
-              <button onClick={clearGrid} className="shrink-0 p-2 text-slate-500 hover:text-rose-400 bg-black/30 border border-white/5 rounded-xl hover:bg-slate-800 transition-colors">
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Controles de Longitud y Páginas */}
-            <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-              
-              {/* Length Selector */}
-              <div className="flex items-center bg-black/40 p-1 rounded-xl border border-white/5">
-                <div className="px-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden sm:block">Length:</div>
-                {[1, 2, 3, 4].map(len => (
-                  <button
-                    key={len}
-                    onClick={() => setPatternLength(len)}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                      patternLength === len 
-                        ? 'bg-slate-700 text-white shadow-sm border border-white/10' 
-                        : 'text-slate-500 hover:text-slate-300'
-                    }`}
-                  >
-                    {len} Bar{len > 1 ? 's' : ''}
-                  </button>
-                ))}
-              </div>
-
-              {/* Page Controls */}
-              <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/5">
-                {Array.from({ length: patternLength }).map((_, page) => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`px-3 py-1.5 text-xs font-bold font-mono rounded-lg transition-all ${
-                      currentPage === page 
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[inset_0_0_10px_rgba(16,185,129,0.1)]' 
-                        : 'text-slate-500 hover:text-slate-300 border border-transparent'
-                    }`}
-                  >
-                    {page * 16 + 1}-{page * 16 + 16}
-                  </button>
-                ))}
-              </div>
-
-              {/* Auto-Follow Toggle */}
-              <button
-                onClick={() => setAutoFollow(!autoFollow)}
-                className={`p-2 rounded-xl border transition-all ${
-                  autoFollow 
-                    ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-400 shadow-[inset_0_0_10px_rgba(99,102,241,0.1)]' 
-                    : 'bg-black/40 border-white/5 text-slate-500'
-                }`}
-                title="Seguir página automáticamente"
-              >
-                <Repeat className="w-4 h-4" />
-              </button>
-
-            </div>
-          </div>
-
-          {/* Cuadrícula Principal (Grid) */}
-          <div className="overflow-x-auto pb-4 custom-scrollbar relative z-10">
-            <div className="min-w-[700px] flex flex-col gap-2 pt-2">
-              {INSTRUMENTS.map((inst) => {
-                const pageSteps = drumGrid[inst.id].slice(currentPage * 16, (currentPage + 1) * 16);
-
-                return (
-                  <div key={inst.id} className="flex items-center gap-3">
-                    
-                    {/* Label del Instrumento */}
-                    <div 
-                      className={`w-16 sm:w-20 shrink-0 h-10 sm:h-12 rounded-xl border flex flex-col items-center justify-center font-bold text-[9px] sm:text-[11px] select-none cursor-pointer transition-all ${
-                        mutes[inst.id] 
-                          ? 'opacity-40 bg-black/50 border-white/5 text-slate-600' 
-                          : `bg-gradient-to-b from-slate-800 to-slate-900 border-white/10 ${inst.text} shadow-md hover:brightness-125`
-                      }`}
+                      className="w-full h-5 sm:h-6 bg-[#3b2a20] rounded shadow-[0_3px_0_#1a110a] active:translate-y-[2px] active:shadow-none border border-[#4a3a30]"
                       onClick={() => { initAudio(); playInstrument(inst.id, audioCtxRef.current?.currentTime || 0); }}
-                    >
-                      <span className="tracking-widest">{inst.id}</span>
-                      <span className="text-[7px] text-slate-500 font-mono hidden sm:block">{inst.name}</span>
-                    </div>
-                    
-                    {/* Fila de Pads */}
-                    <div className="grid grid-cols-16 gap-1.5 flex-1 bg-black/20 p-1.5 rounded-xl border border-white/5">
-                      {pageSteps.map((val, stepInPage) => {
-                        const globalIndex = currentPage * 16 + stepInPage;
-                        const isActive = val === 1;
-                        const isPlayhead = activeStep === globalIndex;
-                        const isBeatStart = stepInPage % 4 === 0;
-
-                        return (
-                          <button
-                            key={stepInPage}
-                            onClick={() => toggleStep(inst.id, stepInPage)}
-                            className={`h-10 sm:h-12 rounded-lg transition-all duration-75 relative overflow-hidden ${
-                              isActive 
-                                ? `${inst.color} border-transparent shadow-[0_0_12px_var(--tw-shadow-color)] ${inst.shadow} z-10 scale-[1.02]` 
-                                : `bg-slate-800/80 hover:bg-slate-700 ${isBeatStart ? 'border-b-2 border-b-slate-600' : 'border-b-2 border-b-slate-800/50'}`
-                            }`}
-                          >
-                            {isPlayhead && (
-                              <div className="absolute inset-0 bg-white/40 shadow-[0_0_15px_rgba(255,255,255,0.8)] z-20"></div>
-                            )}
-                            {isActive && (
-                              <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent pointer-events-none"></div>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    />
                   </div>
-                );
-              })}
 
-              {/* Indicadores de Tiempo (Playhead Track) */}
-              <div className="flex items-center gap-3 mt-2">
-                <div className="w-16 sm:w-20 shrink-0" />
-                <div className="grid grid-cols-16 gap-1.5 flex-1 px-1.5">
-                  {Array.from({ length: 16 }).map((_, stepInPage) => {
-                    const globalIndex = currentPage * 16 + stepInPage;
-                    const isPlayhead = activeStep === globalIndex;
-                    return (
-                      <div key={stepInPage} className="flex justify-center items-center h-4">
-                        <div className={`transition-all duration-75 rounded-full ${
-                          isPlayhead 
-                            ? 'w-2 h-2 bg-white shadow-[0_0_10px_rgba(255,255,255,1)]' 
-                            : 'w-1.5 h-1.5 bg-slate-700/50'
-                        }`} />
-                      </div>
-                    )
-                  })}
+                  {/* 16 Pads */}
+                  <div className="flex-1 grid grid-cols-16 gap-0.5 sm:gap-1.5">
+                    {pageSteps.map((val, stepInPage) => {
+                      const globalIndex = currentPage * 16 + stepInPage;
+                      const isActive = val === 1;
+                      const isPlayhead = activeStep === globalIndex;
+                      const isBeat = stepInPage % 4 === 0;
+
+                      return (
+                        <div key={stepInPage} className="flex flex-col items-center gap-1">
+                          {/* LED Slot */}
+                          <div className={`w-3 h-1 rounded-[1px] shadow-inner transition-colors ${
+                            isActive || isPlayhead 
+                              ? 'bg-[#ffaa00] shadow-[0_0_8px_rgba(255,170,0,0.8)]' 
+                              : 'bg-black/80'
+                          }`}></div>
+                          
+                          {/* Pad Button */}
+                          <button
+                            onClick={() => toggleStep(inst.id, stepInPage)}
+                            className={`w-full aspect-[2/3] rounded border border-black/40 transition-all
+                              ${isActive 
+                                ? 'bg-[#ffaa00] shadow-[inset_0_0_10px_rgba(255,255,255,0.4)] brightness-110' 
+                                : isBeat ? 'bg-[#8a887e] shadow-[0_3px_0_#4a4941]' : 'bg-[#7a786e] shadow-[0_3px_0_#3a3931]'
+                              }
+                              active:translate-y-[2px] active:shadow-none
+                            `}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-
-            </div>
+              );
+            })}
           </div>
 
         </div>
-      </main>
+
+        {/* MIXER & FX SECTION */}
+        {showMixer && (
+          <div className="p-4 sm:p-6 bg-gradient-to-b from-[#3a3931] to-[#2a2921]">
+            
+            {/* Canales (7 columnas) */}
+            <div className="grid grid-cols-7 gap-2 sm:gap-4 border-2 border-[#5a584e] rounded-xl p-2 sm:p-4 bg-[#2a2923] shadow-inner">
+              {INSTRUMENTS.map((inst, idx) => (
+                <div key={inst.id} className={`flex flex-col items-center ${idx !== 6 ? 'border-r border-black/30' : ''}`}>
+                  <span className={`text-[10px] font-bold mb-3 ${inst.id === 'SD' ? 'text-[#a38a6a]' : inst.id === 'CP' ? 'text-orange-400' : inst.id === 'CH' ? 'text-yellow-400' : inst.id === 'OH' ? 'text-lime-400' : inst.id === 'TM' ? 'text-blue-400' : inst.id === 'CB' ? 'text-purple-400' : 'text-[#b8b29c]'}`}>
+                    {inst.id}
+                  </span>
+                  
+                  <span className="text-[8px] font-bold text-[#888] mb-1">MUTE</span>
+                  {/* Metal Toggle Switch */}
+                  <button 
+                    onClick={() => setMutes(prev => ({...prev, [inst.id]: !prev[inst.id]}))}
+                    className="w-4 h-8 bg-black/50 rounded-full shadow-inner relative flex justify-center mb-4 border border-white/5"
+                  >
+                    <div className={`w-3 h-4 bg-gradient-to-b from-[#eee] to-[#888] rounded-full shadow-md absolute transition-all ${mutes[inst.id] ? 'bottom-[2px]' : 'top-[2px]'}`}></div>
+                  </button>
+
+                  <span className="text-[8px] font-bold text-[#888] mb-1 text-center leading-none">PITCH<br/>VOL</span>
+                  {/* Pequeño Knob de Pitch */}
+                  <div className="mb-4">
+                    <RotaryKnob value={pitches[inst.id]} min={0.5} max={2} onChange={(v) => setPitches(prev => ({...prev, [inst.id]: v}))} size={28} />
+                  </div>
+
+                  {/* Fader Vertical (Ranura Oscura) */}
+                  <div className="w-6 h-32 bg-black/80 rounded shadow-inner relative flex justify-center border border-white/5">
+                    {/* Tick marks */}
+                    <div className="absolute inset-y-2 w-full flex flex-col justify-between items-center opacity-30 pointer-events-none">
+                      {[...Array(9)].map((_, i) => <div key={i} className="w-4 h-px bg-white"></div>)}
+                    </div>
+                    {/* Fader Input invisible para controlar */}
+                    <input 
+                      type="range" min="0" max="1" step="0.05" value={volumes[inst.id]} 
+                      onChange={(e) => setVolumes(prev => ({...prev, [inst.id]: parseFloat(e.target.value)}))}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize z-10"
+                      style={{ writingMode: 'bt-lr', WebkitAppearance: 'slider-vertical' }}
+                    />
+                    {/* Tapa del Fader (Cápsula de Color) */}
+                    <div 
+                      className={`w-5 h-8 ${inst.capColor} rounded shadow-lg border border-black/50 absolute pointer-events-none transition-all`}
+                      style={{ bottom: `${volumes[inst.id] * 100}%`, transform: 'translateY(50%)' }}
+                    >
+                      <div className="w-full h-1 bg-black/40 mt-3.5 shadow-sm"></div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Master FX Panel */}
+            <div className="mt-4 border-2 border-[#5a584e] rounded-xl p-4 bg-[#2a2923] shadow-inner flex flex-col sm:flex-row justify-between items-center gap-6">
+              
+              <div className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-[#b8b29c]" />
+                <span className="text-[12px] font-bold text-[#b8b29c] tracking-widest">MASTER FX</span>
+                <span className="text-[12px] text-[#b8b29c]">((•))</span>
+              </div>
+
+              <div className="flex gap-8 items-center">
+                
+                {/* Drive Master */}
+                <div className="flex flex-col items-center">
+                  <RotaryKnob value={masterDrive} min={0} max={1} onChange={setMasterDrive} size={50} isMetallic={true} />
+                  <span className="text-[10px] font-bold text-[#b8b29c] tracking-widest mt-2">DRIVE</span>
+                </div>
+
+                {/* Reverb Master */}
+                <div className="flex flex-col items-center">
+                  <RotaryKnob value={masterReverb} min={0} max={1} onChange={setMasterReverb} size={50} isMetallic={true} />
+                  <span className="text-[10px] font-bold text-[#b8b29c] tracking-widest mt-2">REVERB</span>
+                </div>
+
+                {/* Redundant Faders (Como en el mockup) */}
+                <div className="hidden sm:flex flex-col gap-3 border-l border-black/30 pl-6">
+                  <div className="flex items-center gap-2">
+                    <div className="w-24 h-4 bg-black/80 rounded shadow-inner relative flex items-center border border-white/5">
+                      <div className="absolute inset-x-1 flex justify-between opacity-30 pointer-events-none">
+                        {[...Array(10)].map((_,i)=><div key={i} className="w-px h-2 bg-white"></div>)}
+                      </div>
+                      <input 
+                        type="range" min="0" max="1" step="0.05" value={masterDrive} 
+                        onChange={(e) => setMasterDrive(parseFloat(e.target.value))}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-10"
+                      />
+                      <div className="w-4 h-6 bg-orange-600 rounded shadow border border-black/50 absolute pointer-events-none" style={{ left: `${masterDrive * 100}%`, transform: 'translateX(-50%)' }}>
+                        <div className="w-0.5 h-full bg-black/40 mx-auto"></div>
+                      </div>
+                    </div>
+                    <span className="text-[8px] font-bold text-[#888]">DRIVE</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className="w-24 h-4 bg-black/80 rounded shadow-inner relative flex items-center border border-white/5">
+                      <div className="absolute inset-x-1 flex justify-between opacity-30 pointer-events-none">
+                        {[...Array(10)].map((_,i)=><div key={i} className="w-px h-2 bg-white"></div>)}
+                      </div>
+                      <input 
+                        type="range" min="0" max="1" step="0.05" value={masterReverb} 
+                        onChange={(e) => setMasterReverb(parseFloat(e.target.value))}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-10"
+                      />
+                      <div className="w-4 h-6 bg-cyan-600 rounded shadow border border-black/50 absolute pointer-events-none" style={{ left: `${masterReverb * 100}%`, transform: 'translateX(-50%)' }}>
+                        <div className="w-0.5 h-full bg-black/40 mx-auto"></div>
+                      </div>
+                    </div>
+                    <span className="text-[8px] font-bold text-[#888]">REVERB</span>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+        )}
+
+      </div>
 
       <style dangerouslySetInnerHTML={{__html: `
         .grid-cols-16 { grid-template-columns: repeat(16, minmax(0, 1fr)); }
-        
-        /* Custom Scrollbar Premium */
-        .custom-scrollbar::-webkit-scrollbar { height: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-track { 
-          background: rgba(0,0,0,0.2); 
-          border-radius: 8px; 
-          border: 1px solid rgba(255,255,255,0.05);
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb { 
-          background: rgba(255,255,255,0.1); 
-          border-radius: 8px; 
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(255,255,255,0.2);
-        }
       `}} />
     </div>
   );
