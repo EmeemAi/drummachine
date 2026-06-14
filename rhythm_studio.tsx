@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Save, Settings, Activity } from 'lucide-react';
+import { Play, Activity, SlidersHorizontal } from 'lucide-react';
 
 // Utilities
 const rep16 = (arr) => [...arr, ...arr, ...arr, ...arr];
@@ -84,10 +84,10 @@ const RotaryKnob = ({ value, min, max, onChange, size = 50, isMetallic = false }
           style={{ transform: `rotate(${angle}deg)` }}
         >
           {/* Indicador */}
-          <div className={`mx-auto mt-[4px] w-1.5 h-3.5 rounded-full ${isMetallic ? 'bg-[#111] shadow-inner' : 'bg-[#eab308] shadow-[0_0_6px_rgba(234,179,8,0.6)]'}`}></div>
+          <div className={`mx-auto mt-[4px] rounded-full ${isMetallic ? 'w-1.5 h-3.5 bg-[#111] shadow-inner' : 'w-1 h-3 bg-[#eab308] shadow-[0_0_6px_rgba(234,179,8,0.6)]'}`}></div>
         </div>
         
-        {/* Relieve circular central para dar más realismo 3D */}
+        {/* Relieve circular central */}
         <div className="absolute inset-[20%] rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),0_1px_2px_rgba(255,255,255,0.1)] pointer-events-none"></div>
       </div>
     </div>
@@ -96,7 +96,6 @@ const RotaryKnob = ({ value, min, max, onChange, size = 50, isMetallic = false }
 
 export default function RhythmStudio() {
   useEffect(() => {
-    // Fuentes: DSEG para el LCD, Inter para UI
     const link = document.createElement('link');
     link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Share+Tech+Mono&display=swap';
     link.rel = 'stylesheet';
@@ -105,16 +104,14 @@ export default function RhythmStudio() {
   }, []);
 
   const [isPlaying, setIsPlaying] = useState(false);
-  const [tempo, setTempo] = useState(155);
+  const [tempo, setTempo] = useState(128);
   const [swing, setSwing] = useState(0); 
   const [activeStep, setActiveStep] = useState(-1);
   const [currentPreset, setCurrentPreset] = useState('vacio');
-  const [showMixer, setShowMixer] = useState(true); // Siempre visible en escritorio, togglable en móvil opcionalmente. El mockup lo muestra todo.
+  const [showMixer, setShowMixer] = useState(true);
 
   const [currentPage, setCurrentPage] = useState(0); 
-  const [autoFollow, setAutoFollow] = useState(true);
   const [patternLength, setPatternLength] = useState(1);
-
   const [drumGrid, setDrumGrid] = useState(PRESETS.house.grid);
 
   // Mixer
@@ -122,16 +119,33 @@ export default function RhythmStudio() {
   const [mutes, setMutes] = useState({ BD: false, SD: false, CP: false, CH: false, OH: false, TM: false, CB: false });
   const [pitches, setPitches] = useState({ BD: 1.0, SD: 1.0, CP: 1.0, CH: 1.0, OH: 1.0, TM: 1.0, CB: 1.0 });
 
-  // Efectos Master
-  const [masterDrive, setMasterDrive] = useState(0.2); // El mockup muestra algo de drive
-  const [masterReverb, setMasterReverb] = useState(0.3);
+  // Efectos Master Avanzados
+  const [masterDrive, setMasterDrive] = useState(0.0); // Distorsión analógica
+  const [masterReverb, setMasterReverb] = useState(0.0); // Eco de salón
+  const [masterFilter, setMasterFilter] = useState(1.0); // Filtro paso-bajo (1.0 = Abierto)
+  const [masterDelay, setMasterDelay] = useState(0.0); // Eco rítmico (cantidad)
+  const [masterComp, setMasterComp] = useState(0.0); // Compresión de estudio (Punch)
+  const [masterCrush, setMasterCrush] = useState(0.0); // Bitcrusher (Lo-Fi)
+  const [masterVol, setMasterVol] = useState(0.8); // Volumen General
 
-  // Referencias de Audio
+  // Refs para AudioNodes
   const audioCtxRef = useRef(null);
   const masterGainRef = useRef(null);
   const noiseBufferRef = useRef(null);
-  const cleanGainRef = useRef(null);
+  
+  const cleanCrushGainRef = useRef(null);
+  const crushGainRef = useRef(null);
+  
+  const filterNodeRef = useRef(null);
+  
+  const cleanDriveGainRef = useRef(null);
   const driveGainRef = useRef(null);
+  
+  const compNodeRef = useRef(null);
+  
+  const delayNodeRef = useRef(null);
+  const delayWetGainRef = useRef(null);
+  
   const wetReverbGainRef = useRef(null);
   const dryReverbGainRef = useRef(null);
 
@@ -153,24 +167,9 @@ export default function RhythmStudio() {
 
   const nextStepTimeRef = useRef(0.0);
   const currentStepRef = useRef(0);
-  const scheduleAheadTime = 0.1;
-  const lookahead = 25.0;
   const timerIdRef = useRef(null);
 
-  useEffect(() => {
-    if (currentPage >= patternLength) setCurrentPage(patternLength - 1);
-  }, [patternLength, currentPage]);
-
-  useEffect(() => {
-    if (autoFollow && activeStep !== -1) {
-      const pageOfStep = Math.floor(activeStep / 16);
-      if (pageOfStep !== currentPage && pageOfStep < patternLength) {
-        setCurrentPage(pageOfStep);
-      }
-    }
-  }, [activeStep, autoFollow, currentPage, patternLength]);
-
-  // Motor de Audio
+  // Inicialización de la cadena de efectos masiva
   const initAudio = () => {
     if (!audioCtxRef.current) {
       try {
@@ -178,42 +177,92 @@ export default function RhythmStudio() {
         const ctx = new AudioContext();
         audioCtxRef.current = ctx;
         
+        // Ruido blanco
         const bufferSize = ctx.sampleRate * 2;
         const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
         const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-          data[i] = Math.random() * 2 - 1;
-        }
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
         noiseBufferRef.current = buffer;
 
+        // 1. MASTER GAIN PRINCIPAL
         const masterGain = ctx.createGain();
         masterGainRef.current = masterGain;
 
-        const cleanGain = ctx.createGain();
+        // 2. BITCRUSHER (Lo-Fi WaveShaper)
+        const crushNode = ctx.createWaveShaper();
+        const makeCrushCurve = (bits) => {
+          const steps = Math.pow(2, bits);
+          const curve = new Float32Array(44100);
+          for(let i=0; i<44100; i++) {
+            let x = i * 2 / 44100 - 1;
+            curve[i] = Math.round(x * steps) / steps;
+          }
+          return curve;
+        };
+        crushNode.curve = makeCrushCurve(4); // 4-bit crujiente
+        const cleanCrushGain = ctx.createGain();
+        const crushGain = ctx.createGain();
+        cleanCrushGainRef.current = cleanCrushGain;
+        crushGainRef.current = crushGain;
+        
+        masterGain.connect(cleanCrushGain);
+        masterGain.connect(crushNode);
+        crushNode.connect(crushGain);
+        
+        const postCrushNode = ctx.createGain();
+        cleanCrushGain.connect(postCrushNode);
+        crushGain.connect(postCrushNode);
+
+        // 3. FILTRO MOOG (Lowpass)
+        const filterNode = ctx.createBiquadFilter();
+        filterNode.type = 'lowpass';
+        filterNode.Q.value = 5; // Resonancia analógica clásica
+        filterNodeRef.current = filterNode;
+        postCrushNode.connect(filterNode);
+
+        // 4. DRIVE (Tube Distortion)
+        const driveNode = ctx.createWaveShaper();
+        const k = 400; const deg = Math.PI / 180;
+        const driveCurve = new Float32Array(44100);
+        for (let i = 0; i < 44100; ++i ) {
+          const x = i * 2 / 44100 - 1;
+          driveCurve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
+        }
+        driveNode.curve = driveCurve;
+        driveNode.oversample = '4x';
+        
+        const cleanDriveGain = ctx.createGain();
         const driveGain = ctx.createGain();
-        cleanGainRef.current = cleanGain;
+        cleanDriveGainRef.current = cleanDriveGain;
         driveGainRef.current = driveGain;
 
-        const waveShaper = ctx.createWaveShaper();
-        const k = 400; 
-        const n_samples = 44100;
-        const curve = new Float32Array(n_samples);
-        const deg = Math.PI / 180;
-        for (let i = 0; i < n_samples; ++i ) {
-          const x = i * 2 / n_samples - 1;
-          curve[i] = ( 3 + k ) * x * 20 * deg / ( Math.PI + k * Math.abs(x) );
-        }
-        waveShaper.curve = curve;
-        waveShaper.oversample = '4x';
+        filterNode.connect(cleanDriveGain);
+        filterNode.connect(driveNode);
+        driveNode.connect(driveGain);
+        
+        const postDriveNode = ctx.createGain();
+        cleanDriveGain.connect(postDriveNode);
+        driveGain.connect(postDriveNode);
 
-        masterGain.connect(cleanGain);
-        masterGain.connect(waveShaper);
-        waveShaper.connect(driveGain);
+        // 5. COMPRESOR MASTER (Punch)
+        const compNode = ctx.createDynamicsCompressor();
+        compNodeRef.current = compNode;
+        postDriveNode.connect(compNode);
 
-        const preReverbNode = ctx.createGain();
-        cleanGain.connect(preReverbNode);
-        driveGain.connect(preReverbNode);
+        // 6. DELAY RÍTMICO
+        const delayNode = ctx.createDelay(2.0);
+        const delayFeedback = ctx.createGain();
+        delayFeedback.gain.value = 0.4; // Colas de repetición moderadas
+        const delayWetGain = ctx.createGain();
+        delayNodeRef.current = delayNode;
+        delayWetGainRef.current = delayWetGain;
+        
+        compNode.connect(delayNode);
+        delayNode.connect(delayFeedback);
+        delayFeedback.connect(delayNode);
+        delayNode.connect(delayWetGain);
 
+        // 7. REVERB DE SALÓN
         const dryReverbGain = ctx.createGain();
         const wetReverbGain = ctx.createGain();
         dryReverbGainRef.current = dryReverbGain;
@@ -231,19 +280,20 @@ export default function RhythmStudio() {
         }
         convolver.buffer = impulse;
 
-        preReverbNode.connect(dryReverbGain);
-        preReverbNode.connect(convolver);
+        compNode.connect(dryReverbGain);
+        compNode.connect(convolver);
         convolver.connect(wetReverbGain);
 
-        dryReverbGain.connect(ctx.destination);
-        wetReverbGain.connect(ctx.destination);
+        // DESTINO FINAL
+        const finalMasterVolNode = ctx.createGain();
+        dryReverbGain.connect(finalMasterVolNode);
+        wetReverbGain.connect(finalMasterVolNode);
+        delayWetGain.connect(finalMasterVolNode);
+        finalMasterVolNode.connect(ctx.destination);
+        masterGainRef.current.finalVol = finalMasterVolNode;
 
+        // Init values
         masterGain.gain.value = 1.0;
-        cleanGain.gain.value = 1;
-        driveGain.gain.value = 0;
-        dryReverbGain.gain.value = 1;
-        wetReverbGain.gain.value = 0;
-
       } catch (e) {
         console.error("Audio init error:", e);
       }
@@ -253,20 +303,61 @@ export default function RhythmStudio() {
     }
   };
 
+  // --- Actualización de Efectos Dinámicos ---
   useEffect(() => {
-    if (cleanGainRef.current && driveGainRef.current) {
-      cleanGainRef.current.gain.setTargetAtTime(1 - masterDrive, audioCtxRef.current.currentTime, 0.05);
+    if (cleanCrushGainRef.current) {
+      cleanCrushGainRef.current.gain.setTargetAtTime(1 - masterCrush, audioCtxRef.current.currentTime, 0.05);
+      crushGainRef.current.gain.setTargetAtTime(masterCrush, audioCtxRef.current.currentTime, 0.05);
+    }
+  }, [masterCrush]);
+
+  useEffect(() => {
+    if (filterNodeRef.current) {
+      // 1.0 = 20kHz (Abierto), 0.0 = 200Hz (Cerrado)
+      const freq = 200 + Math.pow(masterFilter, 3) * 19800;
+      filterNodeRef.current.frequency.setTargetAtTime(freq, audioCtxRef.current.currentTime, 0.05);
+    }
+  }, [masterFilter]);
+
+  useEffect(() => {
+    if (cleanDriveGainRef.current) {
+      cleanDriveGainRef.current.gain.setTargetAtTime(1 - masterDrive, audioCtxRef.current.currentTime, 0.05);
       driveGainRef.current.gain.setTargetAtTime(masterDrive, audioCtxRef.current.currentTime, 0.05);
     }
   }, [masterDrive]);
 
   useEffect(() => {
-    if (wetReverbGainRef.current && dryReverbGainRef.current) {
+    if (compNodeRef.current) {
+      compNodeRef.current.threshold.setTargetAtTime(-40 * masterComp, audioCtxRef.current.currentTime, 0.05);
+      compNodeRef.current.ratio.setTargetAtTime(1 + 19 * masterComp, audioCtxRef.current.currentTime, 0.05);
+      // Make-up gain auto-compensado para que no suene bajito
+      compNodeRef.current.knee.setTargetAtTime(10, audioCtxRef.current.currentTime, 0.05);
+    }
+  }, [masterComp]);
+
+  useEffect(() => {
+    if (delayNodeRef.current) {
+      const beatDuration = 60.0 / tempo;
+      // Dotted 8th note delay (3/4 de un beat)
+      delayNodeRef.current.delayTime.setTargetAtTime(beatDuration * 0.75, audioCtxRef.current.currentTime, 0.1);
+      delayWetGainRef.current.gain.setTargetAtTime(masterDelay, audioCtxRef.current.currentTime, 0.05);
+    }
+  }, [masterDelay, tempo]);
+
+  useEffect(() => {
+    if (wetReverbGainRef.current) {
       wetReverbGainRef.current.gain.setTargetAtTime(masterReverb, audioCtxRef.current.currentTime, 0.05);
       dryReverbGainRef.current.gain.setTargetAtTime(1 - (masterReverb * 0.3), audioCtxRef.current.currentTime, 0.05);
     }
   }, [masterReverb]);
 
+  useEffect(() => {
+    if (masterGainRef.current && masterGainRef.current.finalVol) {
+      masterGainRef.current.finalVol.gain.setTargetAtTime(masterVol, audioCtxRef.current.currentTime, 0.05);
+    }
+  }, [masterVol]);
+
+  // --- Sintetizador (Play) ---
   const playInstrument = (inst, time) => {
     if (mutesRef.current[inst]) return;
     const ctx = audioCtxRef.current;
@@ -281,110 +372,51 @@ export default function RhythmStudio() {
     const safeFreq = (f) => Math.min(f, ctx.sampleRate / 2);
 
     if (inst === 'BD') {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(instGain);
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(instGain);
       osc.frequency.setValueAtTime(safeFreq(150 * pitch), time);
       osc.frequency.exponentialRampToValueAtTime(safeFreq(45 * pitch), time + 0.1);
       gain.gain.setValueAtTime(1.0, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + 0.5);
-      osc.start(time);
-      osc.stop(time + 0.5);
+      osc.start(time); osc.stop(time + 0.5);
     } else if (inst === 'SD') {
-      const noiseSource = ctx.createBufferSource();
-      noiseSource.buffer = noiseBufferRef.current;
-      const noiseFilter = ctx.createBiquadFilter();
-      noiseFilter.type = 'bandpass';
-      noiseFilter.frequency.value = safeFreq(1000 * pitch);
-      const noiseGain = ctx.createGain();
-      noiseGain.gain.setValueAtTime(0.8, time);
-      noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
-      noiseSource.connect(noiseFilter);
-      noiseFilter.connect(noiseGain);
-      noiseGain.connect(instGain);
-
-      const toneOsc = ctx.createOscillator();
-      toneOsc.type = 'triangle';
-      toneOsc.frequency.setValueAtTime(safeFreq(180 * pitch), time);
-      const toneGain = ctx.createGain();
-      toneGain.gain.setValueAtTime(0.5, time);
-      toneGain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
-      toneOsc.connect(toneGain);
-      toneGain.connect(instGain);
-
-      noiseSource.start(time);
-      noiseSource.stop(time + 0.2);
-      toneOsc.start(time);
-      toneOsc.stop(time + 0.1);
+      const noiseSource = ctx.createBufferSource(); noiseSource.buffer = noiseBufferRef.current;
+      const noiseFilter = ctx.createBiquadFilter(); noiseFilter.type = 'bandpass'; noiseFilter.frequency.value = safeFreq(1000 * pitch);
+      const noiseGain = ctx.createGain(); noiseGain.gain.setValueAtTime(0.8, time); noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+      noiseSource.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(instGain);
+      const toneOsc = ctx.createOscillator(); toneOsc.type = 'triangle'; toneOsc.frequency.setValueAtTime(safeFreq(180 * pitch), time);
+      const toneGain = ctx.createGain(); toneGain.gain.setValueAtTime(0.5, time); toneGain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+      toneOsc.connect(toneGain); toneGain.connect(instGain);
+      noiseSource.start(time); noiseSource.stop(time + 0.2);
+      toneOsc.start(time); toneOsc.stop(time + 0.1);
     } else if (inst === 'CP') {
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.value = safeFreq(1500 * pitch);
-      filter.Q.value = 0.5;
+      const filter = ctx.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = safeFreq(1500 * pitch); filter.Q.value = 0.5;
       const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0, time);
-      gain.gain.setValueAtTime(1, time + 0.01);
-      gain.gain.setValueAtTime(0, time + 0.02);
-      gain.gain.setValueAtTime(1, time + 0.03);
-      gain.gain.setValueAtTime(0, time + 0.04);
-      gain.gain.setValueAtTime(1, time + 0.05);
+      gain.gain.setValueAtTime(0, time); gain.gain.setValueAtTime(1, time + 0.01); gain.gain.setValueAtTime(0, time + 0.02); gain.gain.setValueAtTime(1, time + 0.03); gain.gain.setValueAtTime(0, time + 0.04); gain.gain.setValueAtTime(1, time + 0.05);
       gain.gain.exponentialRampToValueAtTime(0.001, time + 0.25);
-      const noiseSource = ctx.createBufferSource();
-      noiseSource.buffer = noiseBufferRef.current;
-      noiseSource.connect(filter);
-      filter.connect(gain);
-      gain.connect(instGain);
-      noiseSource.start(time);
-      noiseSource.stop(time + 0.3);
+      const noiseSource = ctx.createBufferSource(); noiseSource.buffer = noiseBufferRef.current;
+      noiseSource.connect(filter); filter.connect(gain); gain.connect(instGain);
+      noiseSource.start(time); noiseSource.stop(time + 0.3);
     } else if (inst === 'CH' || inst === 'OH') {
-      const source = ctx.createBufferSource();
-      source.buffer = noiseBufferRef.current;
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'highpass';
-      filter.frequency.setValueAtTime(safeFreq(7000 * pitch), time);
-      const gain = ctx.createGain();
-      const isClosed = inst === 'CH';
-      const decay = isClosed ? 0.05 : 0.4;
-      gain.gain.setValueAtTime(0.7, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + decay);
-      source.connect(filter);
-      filter.connect(gain);
-      gain.connect(instGain);
-      source.start(time);
-      source.stop(time + decay);
+      const source = ctx.createBufferSource(); source.buffer = noiseBufferRef.current;
+      const filter = ctx.createBiquadFilter(); filter.type = 'highpass'; filter.frequency.setValueAtTime(safeFreq(7000 * pitch), time);
+      const gain = ctx.createGain(); const isClosed = inst === 'CH'; const decay = isClosed ? 0.05 : 0.4;
+      gain.gain.setValueAtTime(0.7, time); gain.gain.exponentialRampToValueAtTime(0.001, time + decay);
+      source.connect(filter); filter.connect(gain); gain.connect(instGain);
+      source.start(time); source.stop(time + decay);
     } else if (inst === 'TM') {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(instGain);
-      osc.frequency.setValueAtTime(safeFreq(180 * pitch), time);
-      osc.frequency.exponentialRampToValueAtTime(safeFreq(100 * pitch), time + 0.15);
-      gain.gain.setValueAtTime(0.8, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.4);
-      osc.start(time);
-      osc.stop(time + 0.4);
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(instGain);
+      osc.frequency.setValueAtTime(safeFreq(180 * pitch), time); osc.frequency.exponentialRampToValueAtTime(safeFreq(100 * pitch), time + 0.15);
+      gain.gain.setValueAtTime(0.8, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.4);
+      osc.start(time); osc.stop(time + 0.4);
     } else if (inst === 'CB') {
-      const osc1 = ctx.createOscillator();
-      osc1.type = 'square';
-      osc1.frequency.setValueAtTime(safeFreq(540 * pitch), time);
-      const osc2 = ctx.createOscillator();
-      osc2.type = 'square';
-      osc2.frequency.setValueAtTime(safeFreq(800 * pitch), time);
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(safeFreq(860 * pitch), time);
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.5, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
-      osc1.connect(filter);
-      osc2.connect(filter);
-      filter.connect(gain);
-      gain.connect(instGain);
-      osc1.start(time);
-      osc2.start(time);
-      osc1.stop(time + 0.2);
-      osc2.stop(time + 0.2);
+      const osc1 = ctx.createOscillator(); osc1.type = 'square'; osc1.frequency.setValueAtTime(safeFreq(540 * pitch), time);
+      const osc2 = ctx.createOscillator(); osc2.type = 'square'; osc2.frequency.setValueAtTime(safeFreq(800 * pitch), time);
+      const filter = ctx.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.setValueAtTime(safeFreq(860 * pitch), time);
+      const gain = ctx.createGain(); gain.gain.setValueAtTime(0.5, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+      osc1.connect(filter); osc2.connect(filter); filter.connect(gain); gain.connect(instGain);
+      osc1.start(time); osc2.start(time); osc1.stop(time + 0.2); osc2.stop(time + 0.2);
     }
   };
 
@@ -393,36 +425,23 @@ export default function RhythmStudio() {
     let time = baseTime;
     if (step % 2 !== 0) {
       const secondsPerBeat = 60.0 / tempoRef.current;
-      const stepDuration = secondsPerBeat / 4;
-      time += stepDuration * swingRef.current;
+      time += (secondsPerBeat / 4) * swingRef.current;
     }
-
     Object.keys(currentGrid).forEach(inst => {
-      if (currentGrid[inst][step]) {
-        playInstrument(inst, time);
-      }
+      if (currentGrid[inst][step]) playInstrument(inst, time);
     });
   };
 
   const scheduler = useCallback(() => {
     if (!audioCtxRef.current) return;
-
-    while (nextStepTimeRef.current < audioCtxRef.current.currentTime + scheduleAheadTime) {
+    while (nextStepTimeRef.current < audioCtxRef.current.currentTime + 0.1) {
       scheduleNextStep(currentStepRef.current, nextStepTimeRef.current);
-      
-      const secondsPerBeat = 60.0 / tempoRef.current;
-      const stepDuration = secondsPerBeat / 4; 
-      
-      nextStepTimeRef.current += stepDuration;
-      
+      nextStepTimeRef.current += (60.0 / tempoRef.current) / 4;
       const scheduledStep = currentStepRef.current;
       setTimeout(() => setActiveStep(scheduledStep), 0);
-
-      const maxSteps = patternLengthRef.current * 16;
-      currentStepRef.current = (currentStepRef.current + 1) % maxSteps;
+      currentStepRef.current = (currentStepRef.current + 1) % (patternLengthRef.current * 16);
     }
-    
-    timerIdRef.current = setTimeout(scheduler, lookahead);
+    timerIdRef.current = setTimeout(scheduler, 25.0);
   }, []);
 
   const togglePlay = () => {
@@ -451,14 +470,7 @@ export default function RhythmStudio() {
     });
   };
 
-  const loadPreset = (presetKey) => {
-    setCurrentPreset(presetKey);
-    setDrumGrid(PRESETS[presetKey].grid);
-    setPatternLength(PRESETS[presetKey].length || 1);
-    setCurrentPage(0);
-  };
-
-  // UI Components Extras
+  // UI Components
   const PhysicalButton = ({ children, onClick, active, className="" }) => (
     <button 
       onClick={onClick}
@@ -475,236 +487,166 @@ export default function RhythmStudio() {
   return (
     <div className="min-h-screen bg-[#111] flex justify-center py-0 sm:py-6" style={{ fontFamily: "'Inter', sans-serif" }}>
       
-      {/* Contenedor Principal con Bordes de Madera */}
-      <div className="w-full max-w-[500px] bg-gradient-to-b from-[#4a483e] via-[#3a382e] to-[#2b2a22] sm:rounded-xl shadow-2xl relative overflow-hidden border-l-[12px] border-r-[12px] border-[#2b1d14]">
+      {/* Contenedor Principal Dual (Vertical móvil, Horizontal PC) */}
+      <div className="w-full max-w-[500px] lg:max-w-none lg:w-[1100px] bg-gradient-to-b from-[#4a483e] via-[#3a382e] to-[#2b2a22] sm:rounded-xl shadow-2xl relative overflow-hidden border-l-[12px] border-r-[12px] border-[#2b1d14] flex flex-col lg:flex-row">
         
-        {/* Tornillos decorativos */}
-        <div className="absolute top-3 left-3 w-3 h-3 rounded-full bg-gradient-to-br from-[#888] to-[#444] shadow-sm border border-[#222]">
-          <div className="absolute inset-[3px] rotate-45 border-t border-[#222]"></div>
-        </div>
-        <div className="absolute top-3 right-3 w-3 h-3 rounded-full bg-gradient-to-br from-[#888] to-[#444] shadow-sm border border-[#222]">
-           <div className="absolute inset-[3px] -rotate-12 border-t border-[#222]"></div>
-        </div>
-        <div className="absolute bottom-3 left-3 w-3 h-3 rounded-full bg-gradient-to-br from-[#888] to-[#444] shadow-sm border border-[#222]">
-           <div className="absolute inset-[3px] rotate-90 border-t border-[#222]"></div>
-        </div>
-        <div className="absolute bottom-3 right-3 w-3 h-3 rounded-full bg-gradient-to-br from-[#888] to-[#444] shadow-sm border border-[#222]">
-           <div className="absolute inset-[3px] rotate-12 border-t border-[#222]"></div>
-        </div>
-
-        {/* HEADER */}
-        <div className="px-6 py-5 border-b-2 border-[#222] shadow-[0_4px_10px_rgba(0,0,0,0.3)]">
-          <div className="flex justify-between items-start mb-4">
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2 text-[#d4d0c5]">
-                <Activity className="w-8 h-8 opacity-70" />
-                <h1 className="text-2xl font-black tracking-tight drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] leading-none">
-                  Rhythm Studio
-                </h1>
-              </div>
-              <span className="text-[9px] text-[#a09a88] font-mono tracking-widest pl-10 mt-1 opacity-80">Powered by Emeem</span>
-            </div>
-            
-            {/* Pantalla PRO FX */}
-            <div className="bg-[#1a1205] border-2 border-black/80 rounded px-3 py-1 shadow-[inset_0_2px_8px_rgba(0,0,0,1)]">
-              <span className="font-['Share_Tech_Mono'] text-xl text-[#ffaa00] drop-shadow-[0_0_8px_rgba(255,170,0,0.6)]">PRO FX</span>
-            </div>
-          </div>
-
-          <div className="flex gap-4">
-            <div className="flex flex-col items-center">
-              <span className="text-[10px] font-bold text-[#b8b29c] mb-1">SAVE</span>
-              <PhysicalButton className="w-16 h-6 rounded-md bg-[#222] shadow-[0_3px_0_#000] text-transparent">.</PhysicalButton>
-            </div>
-            <div className="flex flex-col items-center">
-              <span className="text-[10px] font-bold text-[#b8b29c] mb-1">MIXER & FX</span>
-              <PhysicalButton onClick={() => setShowMixer(!showMixer)} active={showMixer} className="w-24 h-6 rounded-md bg-[#222] shadow-[0_3px_0_#000] text-transparent">.</PhysicalButton>
-            </div>
-          </div>
-        </div>
-
-        {/* TRANSPORT & TEMPO SECTION */}
-        <div className="px-6 py-5 border-b-2 border-[#222] flex justify-between items-end shadow-[0_4px_10px_rgba(0,0,0,0.2)]">
+        {/* PANEL IZQUIERDO: Secuenciador y Transporte */}
+        <div className="flex-1 flex flex-col border-b-2 lg:border-b-0 lg:border-r-4 border-[#1a1813] relative">
           
-          <div className="flex flex-col items-center gap-2">
-            <button
-              onClick={togglePlay}
-              className={`w-16 h-16 rounded-lg flex items-center justify-center border-2 border-black/50 transition-all ${
-                isPlaying 
-                  ? 'bg-[#1a1a1a] shadow-[inset_0_4px_8px_rgba(0,0,0,0.8)] translate-y-[2px]' 
-                  : 'bg-[#2a2a2a] shadow-[0_6px_0_#111,inset_0_2px_2px_rgba(255,255,255,0.1)]'
-              }`}
-            >
-              <div className={`w-0 h-0 border-t-[12px] border-t-transparent border-l-[20px] border-b-[12px] border-b-transparent transition-colors ${isPlaying ? 'border-l-[#eab308] drop-shadow-[0_0_8px_rgba(234,179,8,0.8)]' : 'border-l-[#16a34a] opacity-80'}`}></div>
-            </button>
-            <span className="text-[11px] font-bold text-[#b8b29c] tracking-widest mt-1">PLAY</span>
-          </div>
-
-          <div className="flex flex-col items-center">
-            <RotaryKnob value={tempo} min={60} max={200} onChange={(v) => setTempo(Math.round(v))} size={60} />
-            <div className="flex justify-between w-full px-2 mt-1">
-              <span className="text-[8px] text-[#888] font-bold">60</span>
-              <span className="text-[8px] text-[#888] font-bold">200</span>
-            </div>
-            <span className="text-[11px] font-bold text-[#b8b29c] tracking-widest mt-1">TEMPO</span>
-          </div>
-
-          {/* LCD TEMPO */}
-          <div className="bg-[#1a1205] border-2 border-black/80 rounded-md px-4 py-2 shadow-[inset_0_2px_8px_rgba(0,0,0,1)] mb-6">
-            <span className="font-['Share_Tech_Mono'] text-3xl text-[#ffaa00] drop-shadow-[0_0_8px_rgba(255,170,0,0.6)]">{Math.round(tempo)}</span>
-            <span className="font-['Share_Tech_Mono'] text-sm text-[#ffaa00]/70 ml-1">BPM</span>
-          </div>
-
-          <div className="flex flex-col items-center">
-            <RotaryKnob value={swing} min={0} max={0.5} onChange={setSwing} size={60} />
-            <div className="flex justify-between w-full px-2 mt-1">
-              <span className="text-[8px] text-[#888] font-bold">0</span>
-              <span className="text-[8px] text-[#888] font-bold">MAX</span>
-            </div>
-            <span className="text-[11px] font-bold text-[#b8b29c] tracking-widest mt-1">SWING</span>
-          </div>
-
-        </div>
-
-        {/* SEQUENCER SECTION */}
-        <div className="px-3 sm:px-6 py-5 border-b-2 border-[#222]">
-          
-          {/* Presets Row */}
-          <div className="flex flex-wrap gap-2 mb-3">
-            {Object.keys(PRESETS).map(key => (
-              <PhysicalButton 
-                key={key} onClick={() => loadPreset(key)} active={currentPreset === key}
-                className="px-3 py-1.5 text-[10px]"
-              >
-                {PRESETS[key].name}
-              </PhysicalButton>
-            ))}
-          </div>
-
-          {/* Length & Pages Row */}
-          <div className="flex flex-wrap gap-2 mb-5">
-            {[1, 2, 3, 4].map(len => (
-              <PhysicalButton 
-                key={len} onClick={() => setPatternLength(len)} active={patternLength === len}
-                className="px-3 py-1.5 text-[10px]"
-              >
-                {len} Bar{len>1?'s':''}
-              </PhysicalButton>
-            ))}
-            <div className="w-px bg-black/40 mx-1"></div>
-            {Array.from({ length: patternLength }).map((_, page) => (
-              <PhysicalButton 
-                key={page} onClick={() => setCurrentPage(page)} active={currentPage === page}
-                className="px-3 py-1.5 text-[10px]"
-              >
-                {page * 16 + 1}-{page * 16 + 16}
-              </PhysicalButton>
-            ))}
-          </div>
-
-          {/* THE GRID */}
-          <div className="flex flex-col gap-3">
-            {INSTRUMENTS.map((inst) => {
-              const pageSteps = drumGrid[inst.id].slice(currentPage * 16, (currentPage + 1) * 16);
-
-              return (
-                <div key={inst.id} className="flex items-center gap-2 sm:gap-3">
-                  {/* Etiqueta / Preview (Boton Marrón) */}
-                  <div className="flex flex-col items-center gap-1 w-8 sm:w-10 shrink-0">
-                    <span className="text-[10px] font-bold text-[#b8b29c]">{inst.id}</span>
-                    <button 
-                      className="w-full h-5 sm:h-6 bg-[#3b2a20] rounded shadow-[0_3px_0_#1a110a] active:translate-y-[2px] active:shadow-none border border-[#4a3a30]"
-                      onClick={() => { initAudio(); playInstrument(inst.id, audioCtxRef.current?.currentTime || 0); }}
-                    />
-                  </div>
-
-                  {/* 16 Pads */}
-                  <div className="flex-1 grid grid-cols-16 gap-0.5 sm:gap-1.5">
-                    {pageSteps.map((val, stepInPage) => {
-                      const globalIndex = currentPage * 16 + stepInPage;
-                      const isActive = val === 1;
-                      const isPlayhead = activeStep === globalIndex;
-                      
-                      // Para alternar el color cada 4 botones y que sea fácil de visualizar
-                      const beatGroup = Math.floor(stepInPage / 4);
-                      const isAlternateBeat = beatGroup % 2 === 1;
-
-                      return (
-                        <div key={stepInPage} className="flex flex-col items-center gap-1">
-                          {/* LED Slot */}
-                          <div className={`w-3 h-1 rounded-[1px] shadow-inner transition-colors ${
-                            isActive || isPlayhead 
-                              ? 'bg-[#ffaa00] shadow-[0_0_8px_rgba(255,170,0,0.8)]' 
-                              : 'bg-black/80'
-                          }`}></div>
-                          
-                          {/* Pad Button */}
-                          <button
-                            onClick={() => toggleStep(inst.id, stepInPage)}
-                            className={`w-full aspect-[2/3] rounded border border-black/40 transition-all
-                              ${isActive 
-                                ? 'bg-[#ffaa00] shadow-[inset_0_0_10px_rgba(255,255,255,0.4)] brightness-110' 
-                                : isAlternateBeat ? 'bg-[#6a685e] shadow-[0_3px_0_#2a2921]' : 'bg-[#8a887e] shadow-[0_3px_0_#4a4941]'
-                              }
-                              active:translate-y-[2px] active:shadow-none
-                            `}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
+          {/* HEADER */}
+          <div className="px-6 py-5 border-b-2 border-[#222] shadow-[0_4px_10px_rgba(0,0,0,0.3)] bg-gradient-to-r from-transparent to-black/10">
+            <div className="flex justify-between items-start mb-4">
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2 text-[#d4d0c5]">
+                  <Activity className="w-8 h-8 opacity-70" />
+                  <h1 className="text-2xl font-black tracking-tight drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] leading-none">
+                    Rhythm Studio
+                  </h1>
                 </div>
-              );
-            })}
+                <span className="text-[9px] text-[#a09a88] font-mono tracking-widest pl-10 mt-1 opacity-80">Powered by Emeem</span>
+              </div>
+              
+              <div className="bg-[#1a1205] border-2 border-black/80 rounded px-3 py-1 shadow-[inset_0_2px_8px_rgba(0,0,0,1)]">
+                <span className="font-['Share_Tech_Mono'] text-xl text-[#ffaa00] drop-shadow-[0_0_8px_rgba(255,170,0,0.6)]">PRO FX</span>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-[#b8b29c] mb-1">SAVE</span>
+                <PhysicalButton className="w-16 h-6 rounded-md bg-[#222] shadow-[0_3px_0_#000] text-transparent">.</PhysicalButton>
+              </div>
+              {/* Botón de Mixer visible solo en móvil */}
+              <div className="flex flex-col items-center lg:hidden">
+                <span className="text-[10px] font-bold text-[#b8b29c] mb-1">MIXER & FX</span>
+                <PhysicalButton onClick={() => setShowMixer(!showMixer)} active={showMixer} className="w-24 h-6 rounded-md bg-[#222] shadow-[0_3px_0_#000] text-transparent">.</PhysicalButton>
+              </div>
+            </div>
           </div>
 
+          {/* TRANSPORT & TEMPO SECTION */}
+          <div className="px-6 py-5 border-b-2 border-[#222] flex justify-between items-end shadow-[0_4px_10px_rgba(0,0,0,0.2)]">
+            <div className="flex flex-col items-center gap-2">
+              <button
+                onClick={togglePlay}
+                className={`w-16 h-16 rounded-lg flex items-center justify-center border-2 border-black/50 transition-all ${
+                  isPlaying ? 'bg-[#1a1a1a] shadow-[inset_0_4px_8px_rgba(0,0,0,0.8)] translate-y-[2px]' : 'bg-[#2a2a2a] shadow-[0_6px_0_#111,inset_0_2px_2px_rgba(255,255,255,0.1)]'
+                }`}
+              >
+                <div className={`w-0 h-0 border-t-[12px] border-t-transparent border-l-[20px] border-b-[12px] border-b-transparent transition-colors ${isPlaying ? 'border-l-[#eab308] drop-shadow-[0_0_8px_rgba(234,179,8,0.8)]' : 'border-l-[#16a34a] opacity-80'}`}></div>
+              </button>
+              <span className="text-[11px] font-bold text-[#b8b29c] tracking-widest mt-1">PLAY</span>
+            </div>
+
+            <div className="flex flex-col items-center">
+              <RotaryKnob value={tempo} min={60} max={200} onChange={(v) => setTempo(Math.round(v))} size={60} />
+              <div className="flex justify-between w-full px-2 mt-1">
+                <span className="text-[8px] text-[#888] font-bold">60</span><span className="text-[8px] text-[#888] font-bold">200</span>
+              </div>
+              <span className="text-[11px] font-bold text-[#b8b29c] tracking-widest mt-1">TEMPO</span>
+            </div>
+
+            <div className="bg-[#1a1205] border-2 border-black/80 rounded-md px-4 py-2 shadow-[inset_0_2px_8px_rgba(0,0,0,1)] mb-6">
+              <span className="font-['Share_Tech_Mono'] text-3xl text-[#ffaa00] drop-shadow-[0_0_8px_rgba(255,170,0,0.6)]">{Math.round(tempo)}</span>
+              <span className="font-['Share_Tech_Mono'] text-sm text-[#ffaa00]/70 ml-1">BPM</span>
+            </div>
+
+            <div className="flex flex-col items-center">
+              <RotaryKnob value={swing} min={0} max={0.5} onChange={setSwing} size={60} />
+              <div className="flex justify-between w-full px-2 mt-1">
+                <span className="text-[8px] text-[#888] font-bold">0</span><span className="text-[8px] text-[#888] font-bold">MAX</span>
+              </div>
+              <span className="text-[11px] font-bold text-[#b8b29c] tracking-widest mt-1">SWING</span>
+            </div>
+          </div>
+
+          {/* SEQUENCER SECTION */}
+          <div className="px-3 sm:px-6 py-5 lg:flex-1">
+            <div className="flex flex-wrap gap-2 mb-3">
+              {Object.keys(PRESETS).map(key => (
+                <PhysicalButton key={key} onClick={() => { setCurrentPreset(key); setDrumGrid(PRESETS[key].grid); setPatternLength(PRESETS[key].length || 1); setCurrentPage(0); }} active={currentPreset === key} className="px-3 py-1.5 text-[10px]">{PRESETS[key].name}</PhysicalButton>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2 mb-5">
+              {[1, 2, 3, 4].map(len => (
+                <PhysicalButton key={len} onClick={() => setPatternLength(len)} active={patternLength === len} className="px-3 py-1.5 text-[10px]">{len} Bar{len>1?'s':''}</PhysicalButton>
+              ))}
+              <div className="w-px bg-black/40 mx-1"></div>
+              {Array.from({ length: patternLength }).map((_, page) => (
+                <PhysicalButton key={page} onClick={() => setCurrentPage(page)} active={currentPage === page} className="px-3 py-1.5 text-[10px]">{page * 16 + 1}-{page * 16 + 16}</PhysicalButton>
+              ))}
+            </div>
+
+            <div className="flex flex-col gap-3">
+              {INSTRUMENTS.map((inst) => {
+                const pageSteps = drumGrid[inst.id].slice(currentPage * 16, (currentPage + 1) * 16);
+                return (
+                  <div key={inst.id} className="flex items-center gap-2 sm:gap-3">
+                    <div className="flex flex-col items-center gap-1 w-8 sm:w-10 shrink-0">
+                      <span className="text-[10px] font-bold text-[#b8b29c]">{inst.id}</span>
+                      <button className="w-full h-5 sm:h-6 bg-[#3b2a20] rounded shadow-[0_3px_0_#1a110a] active:translate-y-[2px] active:shadow-none border border-[#4a3a30]" onClick={() => { initAudio(); playInstrument(inst.id, audioCtxRef.current?.currentTime || 0); }} />
+                    </div>
+                    <div className="flex-1 grid grid-cols-16 gap-0.5 sm:gap-1.5">
+                      {pageSteps.map((val, stepInPage) => {
+                        const globalIndex = currentPage * 16 + stepInPage;
+                        const isActive = val === 1;
+                        const isPlayhead = activeStep === globalIndex;
+                        const isAlternateBeat = Math.floor(stepInPage / 4) % 2 === 1;
+
+                        return (
+                          <div key={stepInPage} className="flex flex-col items-center gap-1">
+                            <div className={`w-3 h-1 rounded-[1px] shadow-inner transition-colors ${isActive || isPlayhead ? 'bg-[#ffaa00] shadow-[0_0_8px_rgba(255,170,0,0.8)]' : 'bg-black/80'}`}></div>
+                            <button
+                              onClick={() => toggleStep(inst.id, stepInPage)}
+                              className={`w-full aspect-[2/3] rounded border border-black/40 transition-all
+                                ${isActive ? 'bg-[#ffaa00] shadow-[inset_0_0_10px_rgba(255,255,255,0.4)] brightness-110' : isAlternateBeat ? 'bg-[#6a685e] shadow-[0_3px_0_#2a2921]' : 'bg-[#8a887e] shadow-[0_3px_0_#4a4941]'}
+                                active:translate-y-[2px] active:shadow-none
+                              `}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
-        {/* MIXER & FX SECTION */}
-        {showMixer && (
-          <div className="p-4 sm:p-6 bg-gradient-to-b from-[#3a3931] to-[#2a2921]">
+        {/* PANEL DERECHO: MIXER & FX */}
+        <div className={`lg:w-[480px] shrink-0 bg-gradient-to-b from-[#3a3931] to-[#2a2921] flex-col ${showMixer ? 'flex' : 'hidden lg:flex'}`}>
+          
+          <div className="p-4 sm:p-6 flex-1 flex flex-col justify-between">
             
             {/* Canales (7 columnas) */}
-            <div className="grid grid-cols-7 gap-2 sm:gap-4 border-2 border-[#5a584e] rounded-xl p-2 sm:p-4 bg-[#2a2923] shadow-inner">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2 lg:gap-3 border-2 border-[#5a584e] rounded-xl p-2 sm:p-4 bg-[#2a2923] shadow-inner flex-1 mb-6">
               {INSTRUMENTS.map((inst, idx) => (
-                <div key={inst.id} className={`flex flex-col items-center ${idx !== 6 ? 'border-r border-black/30' : ''}`}>
-                  <span className={`text-[10px] font-bold mb-3 ${inst.id === 'SD' ? 'text-[#a38a6a]' : inst.id === 'CP' ? 'text-orange-400' : inst.id === 'CH' ? 'text-yellow-400' : inst.id === 'OH' ? 'text-lime-400' : inst.id === 'TM' ? 'text-blue-400' : inst.id === 'CB' ? 'text-purple-400' : 'text-[#b8b29c]'}`}>
+                <div key={inst.id} className={`flex flex-col items-center pt-2 ${idx !== 6 ? 'border-r border-black/30' : ''}`}>
+                  <span className={`text-[10px] lg:text-[11px] font-bold mb-4 ${inst.id === 'SD' ? 'text-[#a38a6a]' : inst.id === 'CP' ? 'text-orange-400' : inst.id === 'CH' ? 'text-yellow-400' : inst.id === 'OH' ? 'text-lime-400' : inst.id === 'TM' ? 'text-blue-400' : inst.id === 'CB' ? 'text-purple-400' : 'text-[#b8b29c]'}`}>
                     {inst.id}
                   </span>
                   
                   <span className="text-[8px] font-bold text-[#888] mb-1">MUTE</span>
-                  {/* Metal Toggle Switch */}
-                  <button 
-                    onClick={() => setMutes(prev => ({...prev, [inst.id]: !prev[inst.id]}))}
-                    className="w-4 h-8 bg-black/50 rounded-full shadow-inner relative flex justify-center mb-4 border border-white/5"
-                  >
+                  <button onClick={() => setMutes(prev => ({...prev, [inst.id]: !prev[inst.id]}))} className="w-4 h-8 bg-black/50 rounded-full shadow-inner relative flex justify-center mb-6 border border-white/5">
                     <div className={`w-3 h-4 bg-gradient-to-b from-[#eee] to-[#888] rounded-full shadow-md absolute transition-all ${mutes[inst.id] ? 'bottom-[2px]' : 'top-[2px]'}`}></div>
                   </button>
 
-                  <span className="text-[8px] font-bold text-[#888] mb-1 text-center leading-none">PITCH<br/>VOL</span>
-                  {/* Pequeño Knob de Pitch */}
-                  <div className="mb-4">
-                    <RotaryKnob value={pitches[inst.id]} min={0.5} max={2} onChange={(v) => setPitches(prev => ({...prev, [inst.id]: v}))} size={28} />
+                  <span className="text-[8px] font-bold text-[#888] mb-1 text-center leading-none">PITCH</span>
+                  <div className="mb-6">
+                    <RotaryKnob value={pitches[inst.id]} min={0.5} max={2} onChange={(v) => setPitches(prev => ({...prev, [inst.id]: v}))} size={30} />
                   </div>
 
-                  {/* Fader Vertical (Ranura Oscura) */}
-                  <div className="w-6 h-32 bg-black/80 rounded shadow-inner relative flex justify-center border border-white/5">
-                    {/* Tick marks */}
+                  <span className="text-[8px] font-bold text-[#888] mb-1 text-center leading-none">VOL</span>
+                  <div className="w-6 flex-1 min-h-[100px] lg:min-h-[150px] bg-black/80 rounded shadow-inner relative flex justify-center border border-white/5 mb-2">
                     <div className="absolute inset-y-2 w-full flex flex-col justify-between items-center opacity-30 pointer-events-none">
                       {[...Array(9)].map((_, i) => <div key={i} className="w-4 h-px bg-white"></div>)}
                     </div>
-                    {/* Fader Input invisible para controlar */}
                     <input 
-                      type="range" min="0" max="1" step="0.05" value={volumes[inst.id]} 
-                      onChange={(e) => setVolumes(prev => ({...prev, [inst.id]: parseFloat(e.target.value)}))}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize z-10"
-                      style={{ writingMode: 'bt-lr', WebkitAppearance: 'slider-vertical' }}
+                      type="range" min="0" max="1" step="0.05" value={volumes[inst.id]} onChange={(e) => setVolumes(prev => ({...prev, [inst.id]: parseFloat(e.target.value)}))}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize z-10" style={{ writingMode: 'bt-lr', WebkitAppearance: 'slider-vertical' }}
                     />
-                    {/* Tapa del Fader (Cápsula de Color) */}
-                    <div 
-                      className={`w-5 h-8 ${inst.capColor} rounded shadow-lg border border-black/50 absolute pointer-events-none transition-all`}
-                      style={{ bottom: `${volumes[inst.id] * 100}%`, transform: 'translateY(50%)' }}
-                    >
+                    <div className={`w-5 h-8 ${inst.capColor} rounded shadow-lg border border-black/50 absolute pointer-events-none transition-all`} style={{ bottom: `${volumes[inst.id] * 100}%`, transform: 'translateY(50%)' }}>
                       <div className="w-full h-1 bg-black/40 mt-3.5 shadow-sm"></div>
                     </div>
                   </div>
@@ -712,78 +654,68 @@ export default function RhythmStudio() {
               ))}
             </div>
 
-            {/* Master FX Panel */}
-            <div className="mt-4 border-2 border-[#5a584e] rounded-xl p-4 bg-[#2a2923] shadow-inner flex flex-col sm:flex-row justify-between items-center gap-6">
-              
-              <div className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-[#b8b29c]" />
-                <span className="text-[12px] font-bold text-[#b8b29c] tracking-widest">MASTER FX</span>
-                <span className="text-[12px] text-[#b8b29c]">((•))</span>
+            {/* MASTER FX (Nuevos Efectos 2x3 Grid) */}
+            <div className="border-2 border-[#5a584e] rounded-xl p-4 bg-[#2a2923] shadow-inner relative">
+              <div className="absolute -top-3 left-4 bg-[#2a2923] px-2 text-[10px] font-bold text-[#b8b29c] tracking-widest flex items-center gap-1">
+                <SlidersHorizontal className="w-3 h-3" /> MASTER FX STUDIO
               </div>
 
-              <div className="flex gap-8 items-center">
+              <div className="grid grid-cols-3 gap-y-6 gap-x-2 mt-2">
                 
-                {/* Drive Master */}
                 <div className="flex flex-col items-center">
-                  <RotaryKnob value={masterDrive} min={0} max={1} onChange={setMasterDrive} size={50} isMetallic={true} />
-                  <span className="text-[10px] font-bold text-[#b8b29c] tracking-widest mt-2">DRIVE</span>
+                  <RotaryKnob value={masterDrive} min={0} max={1} onChange={setMasterDrive} size={45} isMetallic={true} />
+                  <span className="text-[9px] font-bold text-[#b8b29c] tracking-widest mt-2">DRIVE</span>
                 </div>
 
-                {/* Reverb Master */}
                 <div className="flex flex-col items-center">
-                  <RotaryKnob value={masterReverb} min={0} max={1} onChange={setMasterReverb} size={50} isMetallic={true} />
-                  <span className="text-[10px] font-bold text-[#b8b29c] tracking-widest mt-2">REVERB</span>
+                  <RotaryKnob value={masterCrush} min={0} max={1} onChange={setMasterCrush} size={45} isMetallic={true} />
+                  <span className="text-[9px] font-bold text-[#b8b29c] tracking-widest mt-2">LO-FI</span>
                 </div>
 
-                {/* Redundant Faders (Como en el mockup) */}
-                <div className="hidden sm:flex flex-col gap-3 border-l border-black/30 pl-6">
-                  <div className="flex items-center gap-2">
-                    <div className="w-24 h-4 bg-black/80 rounded shadow-inner relative flex items-center border border-white/5">
-                      <div className="absolute inset-x-1 flex justify-between opacity-30 pointer-events-none">
-                        {[...Array(10)].map((_,i)=><div key={i} className="w-px h-2 bg-white"></div>)}
-                      </div>
-                      <input 
-                        type="range" min="0" max="1" step="0.05" value={masterDrive} 
-                        onChange={(e) => setMasterDrive(parseFloat(e.target.value))}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-10"
-                      />
-                      <div className="w-4 h-6 bg-orange-600 rounded shadow border border-black/50 absolute pointer-events-none" style={{ left: `${masterDrive * 100}%`, transform: 'translateX(-50%)' }}>
-                        <div className="w-0.5 h-full bg-black/40 mx-auto"></div>
-                      </div>
-                    </div>
-                    <span className="text-[8px] font-bold text-[#888]">DRIVE</span>
-                  </div>
+                <div className="flex flex-col items-center">
+                  <RotaryKnob value={masterComp} min={0} max={1} onChange={setMasterComp} size={45} isMetallic={true} />
+                  <span className="text-[9px] font-bold text-[#b8b29c] tracking-widest mt-2">COMP</span>
+                </div>
 
-                  <div className="flex items-center gap-2">
-                    <div className="w-24 h-4 bg-black/80 rounded shadow-inner relative flex items-center border border-white/5">
-                      <div className="absolute inset-x-1 flex justify-between opacity-30 pointer-events-none">
-                        {[...Array(10)].map((_,i)=><div key={i} className="w-px h-2 bg-white"></div>)}
-                      </div>
-                      <input 
-                        type="range" min="0" max="1" step="0.05" value={masterReverb} 
-                        onChange={(e) => setMasterReverb(parseFloat(e.target.value))}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-10"
-                      />
-                      <div className="w-4 h-6 bg-cyan-600 rounded shadow border border-black/50 absolute pointer-events-none" style={{ left: `${masterReverb * 100}%`, transform: 'translateX(-50%)' }}>
-                        <div className="w-0.5 h-full bg-black/40 mx-auto"></div>
-                      </div>
-                    </div>
-                    <span className="text-[8px] font-bold text-[#888]">REVERB</span>
-                  </div>
+                <div className="flex flex-col items-center">
+                  <RotaryKnob value={masterFilter} min={0} max={1} onChange={setMasterFilter} size={45} isMetallic={true} />
+                  <span className="text-[9px] font-bold text-[#b8b29c] tracking-widest mt-2">MOOG LPF</span>
+                </div>
+
+                <div className="flex flex-col items-center">
+                  <RotaryKnob value={masterDelay} min={0} max={1} onChange={setMasterDelay} size={45} isMetallic={true} />
+                  <span className="text-[9px] font-bold text-[#b8b29c] tracking-widest mt-2">DELAY</span>
+                </div>
+
+                <div className="flex flex-col items-center">
+                  <RotaryKnob value={masterReverb} min={0} max={1} onChange={setMasterReverb} size={45} isMetallic={true} />
+                  <span className="text-[9px] font-bold text-[#b8b29c] tracking-widest mt-2">REVERB</span>
                 </div>
 
               </div>
 
+              {/* Master Volume Horizontal Slider replacing the old redundant sliders */}
+              <div className="mt-6 pt-4 border-t border-black/30 flex items-center justify-between gap-4">
+                 <span className="text-[10px] font-bold text-[#b8b29c] tracking-widest">OUTPUT</span>
+                 <div className="flex-1 h-4 bg-black/80 rounded shadow-inner relative flex items-center border border-white/5">
+                    <input 
+                      type="range" min="0" max="1" step="0.05" value={masterVol} onChange={(e) => setMasterVol(parseFloat(e.target.value))}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-10"
+                    />
+                    <div className="w-5 h-7 bg-[#d4d0c5] rounded shadow-lg border border-black/50 absolute pointer-events-none transition-all" style={{ left: `${masterVol * 100}%`, transform: 'translateX(-50%)' }}>
+                      <div className="w-0.5 h-full bg-black/40 mx-auto"></div>
+                    </div>
+                 </div>
+              </div>
             </div>
 
           </div>
-        )}
+
+        </div>
 
       </div>
 
-      <style dangerouslySetInnerHTML={{__html: `
-        .grid-cols-16 { grid-template-columns: repeat(16, minmax(0, 1fr)); }
-      `}} />
+      <style dangerouslySetInnerHTML={{__html: `.grid-cols-16 { grid-template-columns: repeat(16, minmax(0, 1fr)); }`}} />
     </div>
   );
 }
