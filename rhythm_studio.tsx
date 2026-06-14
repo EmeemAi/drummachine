@@ -495,11 +495,14 @@ export default function RhythmStudio() {
         {/* HEADER */}
         <div className="px-6 py-5 border-b-2 border-[#222] shadow-[0_4px_10px_rgba(0,0,0,0.3)]">
           <div className="flex justify-between items-start mb-4">
-            <div className="flex items-center gap-2 text-[#d4d0c5]">
-              <Activity className="w-8 h-8 opacity-70" />
-              <h1 className="text-2xl font-black tracking-tight drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
-                Rhythm Studio
-              </h1>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2 text-[#d4d0c5]">
+                <Activity className="w-8 h-8 opacity-70" />
+                <h1 className="text-2xl font-black tracking-tight drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] leading-none">
+                  Rhythm Studio
+                </h1>
+              </div>
+              <span className="text-[9px] text-[#a09a88] font-mono tracking-widest pl-10 mt-1 opacity-80">Powered by Emeem</span>
             </div>
             
             {/* Pantalla PRO FX */}
@@ -538,7 +541,7 @@ export default function RhythmStudio() {
           </div>
 
           <div className="flex flex-col items-center">
-            <RotaryKnob value={tempo} min={60} max={200} onChange={setTempo} size={60} />
+            <RotaryKnob value={tempo} min={60} max={200} onChange={(v) => setTempo(Math.round(v))} size={60} />
             <div className="flex justify-between w-full px-2 mt-1">
               <span className="text-[8px] text-[#888] font-bold">60</span>
               <span className="text-[8px] text-[#888] font-bold">200</span>
@@ -548,7 +551,7 @@ export default function RhythmStudio() {
 
           {/* LCD TEMPO */}
           <div className="bg-[#1a1205] border-2 border-black/80 rounded-md px-4 py-2 shadow-[inset_0_2px_8px_rgba(0,0,0,1)] mb-6">
-            <span className="font-['Share_Tech_Mono'] text-3xl text-[#ffaa00] drop-shadow-[0_0_8px_rgba(255,170,0,0.6)]">{tempo}</span>
+            <span className="font-['Share_Tech_Mono'] text-3xl text-[#ffaa00] drop-shadow-[0_0_8px_rgba(255,170,0,0.6)]">{Math.round(tempo)}</span>
             <span className="font-['Share_Tech_Mono'] text-sm text-[#ffaa00]/70 ml-1">BPM</span>
           </div>
 
@@ -621,7 +624,10 @@ export default function RhythmStudio() {
                       const globalIndex = currentPage * 16 + stepInPage;
                       const isActive = val === 1;
                       const isPlayhead = activeStep === globalIndex;
-                      const isBeat = stepInPage % 4 === 0;
+                      
+                      // Para alternar el color cada 4 botones y que sea fácil de visualizar
+                      const beatGroup = Math.floor(stepInPage / 4);
+                      const isAlternateBeat = beatGroup % 2 === 1;
 
                       return (
                         <div key={stepInPage} className="flex flex-col items-center gap-1">
@@ -638,7 +644,7 @@ export default function RhythmStudio() {
                             className={`w-full aspect-[2/3] rounded border border-black/40 transition-all
                               ${isActive 
                                 ? 'bg-[#ffaa00] shadow-[inset_0_0_10px_rgba(255,255,255,0.4)] brightness-110' 
-                                : isBeat ? 'bg-[#8a887e] shadow-[0_3px_0_#4a4941]' : 'bg-[#7a786e] shadow-[0_3px_0_#3a3931]'
+                                : isAlternateBeat ? 'bg-[#6a685e] shadow-[0_3px_0_#2a2921]' : 'bg-[#8a887e] shadow-[0_3px_0_#4a4941]'
                               }
                               active:translate-y-[2px] active:shadow-none
                             `}
