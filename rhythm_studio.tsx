@@ -292,8 +292,30 @@ export default function RhythmStudio() {
         finalMasterVolNode.connect(ctx.destination);
         masterGainRef.current.finalVol = finalMasterVolNode;
 
-        // Init values
+        // Init values para que inicie limpio
         masterGain.gain.value = 1.0;
+        
+        cleanCrushGain.gain.value = 1 - masterCrush;
+        crushGain.gain.value = masterCrush;
+        
+        filterNode.frequency.value = 200 + Math.pow(masterFilter, 3) * 19800;
+        
+        cleanDriveGain.gain.value = 1 - masterDrive;
+        driveGain.gain.value = masterDrive;
+        
+        compNode.threshold.value = -40 * masterComp;
+        compNode.ratio.value = 1 + 19 * masterComp;
+        compNode.knee.value = 10;
+        
+        const beatDuration = 60.0 / tempo;
+        delayNode.delayTime.value = beatDuration * 0.75;
+        delayWetGain.gain.value = masterDelay;
+        
+        wetReverbGain.gain.value = masterReverb;
+        dryReverbGain.gain.value = 1 - (masterReverb * 0.3);
+        
+        finalMasterVolNode.gain.value = masterVol;
+
       } catch (e) {
         console.error("Audio init error:", e);
       }
@@ -356,6 +378,36 @@ export default function RhythmStudio() {
       masterGainRef.current.finalVol.gain.setTargetAtTime(masterVol, audioCtxRef.current.currentTime, 0.05);
     }
   }, [masterVol]);
+
+  // --- Restaurando Local Storage ---
+  useEffect(() => {
+    const savedState = localStorage.getItem('rhythm_studio_analog');
+    if (savedState) {
+      try {
+        const state = JSON.parse(savedState);
+        if (state.grid) setDrumGrid(state.grid);
+        if (state.tempo) setTempo(state.tempo);
+        if (state.volumes) setVolumes(state.volumes);
+        if (state.pitches) setPitches(state.pitches);
+        if (state.patternLength) setPatternLength(state.patternLength);
+        if (state.masterDrive !== undefined) setMasterDrive(state.masterDrive);
+        if (state.masterReverb !== undefined) setMasterReverb(state.masterReverb);
+        if (state.masterFilter !== undefined) setMasterFilter(state.masterFilter);
+        if (state.masterDelay !== undefined) setMasterDelay(state.masterDelay);
+        if (state.masterComp !== undefined) setMasterComp(state.masterComp);
+        if (state.masterCrush !== undefined) setMasterCrush(state.masterCrush);
+        if (state.masterVol !== undefined) setMasterVol(state.masterVol);
+      } catch (e) {}
+    }
+  }, []);
+
+  const saveStateLocally = () => {
+    const state = { 
+      grid: drumGrid, tempo, volumes, pitches, patternLength, 
+      masterDrive, masterReverb, masterFilter, masterDelay, masterComp, masterCrush, masterVol 
+    };
+    localStorage.setItem('rhythm_studio_analog', JSON.stringify(state));
+  };
 
   // --- Sintetizador (Play) ---
   const playInstrument = (inst, time) => {
@@ -514,7 +566,7 @@ export default function RhythmStudio() {
             <div className="flex gap-4">
               <div className="flex flex-col items-center">
                 <span className="text-[10px] font-bold text-[#b8b29c] mb-1">SAVE</span>
-                <PhysicalButton className="w-16 h-6 rounded-md bg-[#222] shadow-[0_3px_0_#000] text-transparent">.</PhysicalButton>
+                <PhysicalButton onClick={saveStateLocally} className="w-16 h-6 rounded-md bg-[#222] shadow-[0_3px_0_#000] text-[#a8a090] text-[8px]">SAVE</PhysicalButton>
               </div>
               {/* Botón de Mixer visible solo en móvil */}
               <div className="flex flex-col items-center lg:hidden">
