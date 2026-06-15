@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Activity, SlidersHorizontal } from 'lucide-react';
+import { Play, Activity, SlidersHorizontal, Disc } from 'lucide-react';
 
 // Utilities
 const rep16 = (arr) => [...arr, ...arr, ...arr, ...arr];
@@ -86,8 +86,6 @@ const RotaryKnob = ({ value, min, max, onChange, size = 50, isMetallic = false }
           {/* Indicador */}
           <div className={`mx-auto mt-[4px] rounded-full ${isMetallic ? 'w-1.5 h-3.5 bg-[#111] shadow-inner' : 'w-1 h-3 bg-[#eab308] shadow-[0_0_6px_rgba(234,179,8,0.6)]'}`}></div>
         </div>
-        
-        {/* Relieve circular central */}
         <div className="absolute inset-[20%] rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),0_1px_2px_rgba(255,255,255,0.1)] pointer-events-none"></div>
       </div>
     </div>
@@ -120,13 +118,19 @@ export default function RhythmStudio() {
   const [pitches, setPitches] = useState({ BD: 1.0, SD: 1.0, CP: 1.0, CH: 1.0, OH: 1.0, TM: 1.0, CB: 1.0 });
 
   // Efectos Master Avanzados
-  const [masterDrive, setMasterDrive] = useState(0.0); // Distorsión analógica
-  const [masterReverb, setMasterReverb] = useState(0.0); // Eco de salón
-  const [masterFilter, setMasterFilter] = useState(1.0); // Filtro paso-bajo (1.0 = Abierto)
-  const [masterDelay, setMasterDelay] = useState(0.0); // Eco rítmico (cantidad)
-  const [masterComp, setMasterComp] = useState(0.0); // Compresión de estudio (Punch)
-  const [masterCrush, setMasterCrush] = useState(0.0); // Bitcrusher (Lo-Fi)
-  const [masterVol, setMasterVol] = useState(0.8); // Volumen General
+  const [masterDrive, setMasterDrive] = useState(0.0); 
+  const [masterReverb, setMasterReverb] = useState(0.0); 
+  const [masterFilter, setMasterFilter] = useState(1.0); 
+  const [masterDelay, setMasterDelay] = useState(0.0); 
+  const [masterComp, setMasterComp] = useState(0.0); 
+  const [masterCrush, setMasterCrush] = useState(0.0); 
+  const [masterVol, setMasterVol] = useState(0.8); 
+
+  // Grabación
+  const [isRecording, setIsRecording] = useState(false);
+  const isRecordingRef = useRef(false);
+  const audioChunksRef = useRef([[], []]);
+  const recorderNodeRef = useRef(null);
 
   // Refs para AudioNodes
   const audioCtxRef = useRef(null);
@@ -135,17 +139,12 @@ export default function RhythmStudio() {
   
   const cleanCrushGainRef = useRef(null);
   const crushGainRef = useRef(null);
-  
   const filterNodeRef = useRef(null);
-  
   const cleanDriveGainRef = useRef(null);
   const driveGainRef = useRef(null);
-  
   const compNodeRef = useRef(null);
-  
   const delayNodeRef = useRef(null);
   const delayWetGainRef = useRef(null);
-  
   const wetReverbGainRef = useRef(null);
   const dryReverbGainRef = useRef(null);
 
@@ -169,7 +168,6 @@ export default function RhythmStudio() {
   const currentStepRef = useRef(0);
   const timerIdRef = useRef(null);
 
-  // Inicialización de la cadena de efectos masiva
   const initAudio = () => {
     if (!audioCtxRef.current) {
       try {
@@ -177,18 +175,15 @@ export default function RhythmStudio() {
         const ctx = new AudioContext();
         audioCtxRef.current = ctx;
         
-        // Ruido blanco
         const bufferSize = ctx.sampleRate * 2;
         const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
         noiseBufferRef.current = buffer;
 
-        // 1. MASTER GAIN PRINCIPAL
         const masterGain = ctx.createGain();
         masterGainRef.current = masterGain;
 
-        // 2. BITCRUSHER (Lo-Fi WaveShaper)
         const crushNode = ctx.createWaveShaper();
         const makeCrushCurve = (bits) => {
           const steps = Math.pow(2, bits);
@@ -199,7 +194,7 @@ export default function RhythmStudio() {
           }
           return curve;
         };
-        crushNode.curve = makeCrushCurve(4); // 4-bit crujiente
+        crushNode.curve = makeCrushCurve(4); 
         const cleanCrushGain = ctx.createGain();
         const crushGain = ctx.createGain();
         cleanCrushGainRef.current = cleanCrushGain;
@@ -213,14 +208,12 @@ export default function RhythmStudio() {
         cleanCrushGain.connect(postCrushNode);
         crushGain.connect(postCrushNode);
 
-        // 3. FILTRO MOOG (Lowpass)
         const filterNode = ctx.createBiquadFilter();
         filterNode.type = 'lowpass';
-        filterNode.Q.value = 5; // Resonancia analógica clásica
+        filterNode.Q.value = 5; 
         filterNodeRef.current = filterNode;
         postCrushNode.connect(filterNode);
 
-        // 4. DRIVE (Tube Distortion)
         const driveNode = ctx.createWaveShaper();
         const k = 400; const deg = Math.PI / 180;
         const driveCurve = new Float32Array(44100);
@@ -244,15 +237,13 @@ export default function RhythmStudio() {
         cleanDriveGain.connect(postDriveNode);
         driveGain.connect(postDriveNode);
 
-        // 5. COMPRESOR MASTER (Punch)
         const compNode = ctx.createDynamicsCompressor();
         compNodeRef.current = compNode;
         postDriveNode.connect(compNode);
 
-        // 6. DELAY RÍTMICO
         const delayNode = ctx.createDelay(2.0);
         const delayFeedback = ctx.createGain();
-        delayFeedback.gain.value = 0.4; // Colas de repetición moderadas
+        delayFeedback.gain.value = 0.4; 
         const delayWetGain = ctx.createGain();
         delayNodeRef.current = delayNode;
         delayWetGainRef.current = delayWetGain;
@@ -262,7 +253,6 @@ export default function RhythmStudio() {
         delayFeedback.connect(delayNode);
         delayNode.connect(delayWetGain);
 
-        // 7. REVERB DE SALÓN
         const dryReverbGain = ctx.createGain();
         const wetReverbGain = ctx.createGain();
         dryReverbGainRef.current = dryReverbGain;
@@ -284,13 +274,27 @@ export default function RhythmStudio() {
         compNode.connect(convolver);
         convolver.connect(wetReverbGain);
 
-        // DESTINO FINAL
         const finalMasterVolNode = ctx.createGain();
         dryReverbGain.connect(finalMasterVolNode);
         wetReverbGain.connect(finalMasterVolNode);
         delayWetGain.connect(finalMasterVolNode);
         finalMasterVolNode.connect(ctx.destination);
         masterGainRef.current.finalVol = finalMasterVolNode;
+
+        // --- CINTA DE GRABACIÓN ---
+        if (!recorderNodeRef.current) {
+          const recorder = ctx.createScriptProcessor(4096, 2, 2);
+          recorder.onaudioprocess = (e) => {
+            if (!isRecordingRef.current) return;
+            const leftData = e.inputBuffer.getChannelData(0);
+            const rightData = e.inputBuffer.getChannelData(1);
+            audioChunksRef.current[0].push(new Float32Array(leftData));
+            audioChunksRef.current[1].push(new Float32Array(rightData));
+          };
+          finalMasterVolNode.connect(recorder);
+          recorder.connect(ctx.destination);
+          recorderNodeRef.current = recorder;
+        }
 
         // Init values para que inicie limpio
         masterGain.gain.value = 1.0;
@@ -325,7 +329,6 @@ export default function RhythmStudio() {
     }
   };
 
-  // --- Actualización de Efectos Dinámicos ---
   useEffect(() => {
     if (cleanCrushGainRef.current) {
       cleanCrushGainRef.current.gain.setTargetAtTime(1 - masterCrush, audioCtxRef.current.currentTime, 0.05);
@@ -335,7 +338,6 @@ export default function RhythmStudio() {
 
   useEffect(() => {
     if (filterNodeRef.current) {
-      // 1.0 = 20kHz (Abierto), 0.0 = 200Hz (Cerrado)
       const freq = 200 + Math.pow(masterFilter, 3) * 19800;
       filterNodeRef.current.frequency.setTargetAtTime(freq, audioCtxRef.current.currentTime, 0.05);
     }
@@ -352,7 +354,6 @@ export default function RhythmStudio() {
     if (compNodeRef.current) {
       compNodeRef.current.threshold.setTargetAtTime(-40 * masterComp, audioCtxRef.current.currentTime, 0.05);
       compNodeRef.current.ratio.setTargetAtTime(1 + 19 * masterComp, audioCtxRef.current.currentTime, 0.05);
-      // Make-up gain auto-compensado para que no suene bajito
       compNodeRef.current.knee.setTargetAtTime(10, audioCtxRef.current.currentTime, 0.05);
     }
   }, [masterComp]);
@@ -360,7 +361,6 @@ export default function RhythmStudio() {
   useEffect(() => {
     if (delayNodeRef.current) {
       const beatDuration = 60.0 / tempo;
-      // Dotted 8th note delay (3/4 de un beat)
       delayNodeRef.current.delayTime.setTargetAtTime(beatDuration * 0.75, audioCtxRef.current.currentTime, 0.1);
       delayWetGainRef.current.gain.setTargetAtTime(masterDelay, audioCtxRef.current.currentTime, 0.05);
     }
@@ -379,7 +379,6 @@ export default function RhythmStudio() {
     }
   }, [masterVol]);
 
-  // --- Restaurando Local Storage ---
   useEffect(() => {
     const savedState = localStorage.getItem('rhythm_studio_analog');
     if (savedState) {
@@ -409,7 +408,78 @@ export default function RhythmStudio() {
     localStorage.setItem('rhythm_studio_analog', JSON.stringify(state));
   };
 
-  // --- Sintetizador (Play) ---
+  const exportWav = (audioChunksLeft, audioChunksRight, sampleRate) => {
+    let length = 0;
+    audioChunksLeft.forEach(chunk => length += chunk.length);
+    const leftBuffer = new Float32Array(length);
+    const rightBuffer = new Float32Array(length);
+    let offset = 0;
+    for(let i=0; i<audioChunksLeft.length; i++) {
+      leftBuffer.set(audioChunksLeft[i], offset);
+      rightBuffer.set(audioChunksRight[i], offset);
+      offset += audioChunksLeft[i].length;
+    }
+
+    const interleaved = new Float32Array(length * 2);
+    for(let i=0; i<length; i++) {
+      interleaved[i*2] = leftBuffer[i];
+      interleaved[i*2+1] = rightBuffer[i];
+    }
+
+    const buffer = new ArrayBuffer(44 + interleaved.length * 2);
+    const view = new DataView(buffer);
+    const writeString = (view, offset, string) => {
+      for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
+    };
+
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + interleaved.length * 2, true);
+    writeString(view, 8, 'WAVE');
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 2, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 4, true);
+    view.setUint16(32, 4, true);
+    view.setUint16(34, 16, true);
+    writeString(view, 36, 'data');
+    view.setUint32(40, interleaved.length * 2, true);
+
+    let index = 44;
+    for (let i = 0; i < interleaved.length; i++) {
+      let sample = Math.max(-1, Math.min(1, interleaved[i]));
+      sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+      view.setInt16(index, sample, true);
+      index += 2;
+    }
+
+    const blob = new Blob([view], { type: 'audio/wav' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = 'rhythm_studio_bounce.wav';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleRecordToggle = () => {
+    initAudio();
+    if (isRecording) {
+      setIsRecording(false);
+      isRecordingRef.current = false;
+      exportWav(audioChunksRef.current[0], audioChunksRef.current[1], audioCtxRef.current.sampleRate);
+      audioChunksRef.current = [[], []]; 
+    } else {
+      audioChunksRef.current = [[], []];
+      setIsRecording(true);
+      isRecordingRef.current = true;
+      if (!isPlaying) togglePlay();
+    }
+  };
+
   const playInstrument = (inst, time) => {
     if (mutesRef.current[inst]) return;
     const ctx = audioCtxRef.current;
@@ -522,7 +592,6 @@ export default function RhythmStudio() {
     });
   };
 
-  // UI Components
   const PhysicalButton = ({ children, onClick, active, className="" }) => (
     <button 
       onClick={onClick}
@@ -539,10 +608,8 @@ export default function RhythmStudio() {
   return (
     <div className="min-h-screen bg-[#111] flex justify-center py-0 sm:py-6" style={{ fontFamily: "'Inter', sans-serif" }}>
       
-      {/* Contenedor Principal Dual (Vertical móvil, Horizontal PC) */}
       <div className="w-full max-w-[500px] lg:max-w-none lg:w-[1100px] bg-gradient-to-b from-[#4a483e] via-[#3a382e] to-[#2b2a22] sm:rounded-xl shadow-2xl relative overflow-hidden border-l-[12px] border-r-[12px] border-[#2b1d14] flex flex-col lg:flex-row">
         
-        {/* PANEL IZQUIERDO: Secuenciador y Transporte */}
         <div className="flex-1 flex flex-col border-b-2 lg:border-b-0 lg:border-r-4 border-[#1a1813] relative">
           
           {/* HEADER */}
@@ -568,23 +635,28 @@ export default function RhythmStudio() {
                 <span className="text-[10px] font-bold text-[#b8b29c] mb-1">SAVE</span>
                 <PhysicalButton onClick={saveStateLocally} className="w-16 h-6 rounded-md bg-[#222] shadow-[0_3px_0_#000] text-[#a8a090] text-[8px]">SAVE</PhysicalButton>
               </div>
-              {/* Botón de Mixer visible solo en móvil */}
-              <div className="flex flex-col items-center lg:hidden">
+              
+              <div className="flex flex-col items-center">
+                <span className={`text-[10px] font-bold mb-1 ${isRecording ? 'text-rose-500 animate-pulse' : 'text-[#b8b29c]'}`}>REC</span>
+                <PhysicalButton 
+                  onClick={handleRecordToggle} 
+                  active={isRecording}
+                  className={`w-16 h-6 rounded-md shadow-[0_3px_0_#000] text-[8px] ${isRecording ? 'bg-rose-900 text-rose-400' : 'bg-[#222] text-[#a8a090]'}`}
+                >
+                  <Disc className="w-3 h-3" />
+                </PhysicalButton>
+              </div>
+
+              <div className="flex flex-col items-center lg:hidden ml-auto">
                 <span className="text-[10px] font-bold text-[#b8b29c] mb-1">MIXER & FX</span>
                 <PhysicalButton onClick={() => setShowMixer(!showMixer)} active={showMixer} className="w-24 h-6 rounded-md bg-[#222] shadow-[0_3px_0_#000] text-transparent">.</PhysicalButton>
               </div>
             </div>
           </div>
 
-          {/* TRANSPORT & TEMPO SECTION */}
           <div className="px-6 py-5 border-b-2 border-[#222] flex justify-between items-end shadow-[0_4px_10px_rgba(0,0,0,0.2)]">
             <div className="flex flex-col items-center gap-2">
-              <button
-                onClick={togglePlay}
-                className={`w-16 h-16 rounded-lg flex items-center justify-center border-2 border-black/50 transition-all ${
-                  isPlaying ? 'bg-[#1a1a1a] shadow-[inset_0_4px_8px_rgba(0,0,0,0.8)] translate-y-[2px]' : 'bg-[#2a2a2a] shadow-[0_6px_0_#111,inset_0_2px_2px_rgba(255,255,255,0.1)]'
-                }`}
-              >
+              <button onClick={togglePlay} className={`w-16 h-16 rounded-lg flex items-center justify-center border-2 border-black/50 transition-all ${isPlaying ? 'bg-[#1a1a1a] shadow-[inset_0_4px_8px_rgba(0,0,0,0.8)] translate-y-[2px]' : 'bg-[#2a2a2a] shadow-[0_6px_0_#111,inset_0_2px_2px_rgba(255,255,255,0.1)]'}`}>
                 <div className={`w-0 h-0 border-t-[12px] border-t-transparent border-l-[20px] border-b-[12px] border-b-transparent transition-colors ${isPlaying ? 'border-l-[#eab308] drop-shadow-[0_0_8px_rgba(234,179,8,0.8)]' : 'border-l-[#16a34a] opacity-80'}`}></div>
               </button>
               <span className="text-[11px] font-bold text-[#b8b29c] tracking-widest mt-1">PLAY</span>
@@ -612,7 +684,6 @@ export default function RhythmStudio() {
             </div>
           </div>
 
-          {/* SEQUENCER SECTION */}
           <div className="px-3 sm:px-6 py-5 lg:flex-1">
             <div className="flex flex-wrap gap-2 mb-3">
               {Object.keys(PRESETS).map(key => (
@@ -666,29 +737,22 @@ export default function RhythmStudio() {
           </div>
         </div>
 
-        {/* PANEL DERECHO: MIXER & FX */}
         <div className={`lg:w-[480px] shrink-0 bg-gradient-to-b from-[#3a3931] to-[#2a2921] flex-col ${showMixer ? 'flex' : 'hidden lg:flex'}`}>
-          
           <div className="p-4 sm:p-6 flex-1 flex flex-col justify-between">
-            
-            {/* Canales (7 columnas) */}
             <div className="grid grid-cols-7 gap-1 sm:gap-2 lg:gap-3 border-2 border-[#5a584e] rounded-xl p-2 sm:p-4 bg-[#2a2923] shadow-inner flex-1 mb-6">
               {INSTRUMENTS.map((inst, idx) => (
                 <div key={inst.id} className={`flex flex-col items-center pt-2 ${idx !== 6 ? 'border-r border-black/30' : ''}`}>
                   <span className={`text-[10px] lg:text-[11px] font-bold mb-4 ${inst.id === 'SD' ? 'text-[#a38a6a]' : inst.id === 'CP' ? 'text-orange-400' : inst.id === 'CH' ? 'text-yellow-400' : inst.id === 'OH' ? 'text-lime-400' : inst.id === 'TM' ? 'text-blue-400' : inst.id === 'CB' ? 'text-purple-400' : 'text-[#b8b29c]'}`}>
                     {inst.id}
                   </span>
-                  
                   <span className="text-[8px] font-bold text-[#888] mb-1">MUTE</span>
                   <button onClick={() => setMutes(prev => ({...prev, [inst.id]: !prev[inst.id]}))} className="w-4 h-8 bg-black/50 rounded-full shadow-inner relative flex justify-center mb-6 border border-white/5">
                     <div className={`w-3 h-4 bg-gradient-to-b from-[#eee] to-[#888] rounded-full shadow-md absolute transition-all ${mutes[inst.id] ? 'bottom-[2px]' : 'top-[2px]'}`}></div>
                   </button>
-
                   <span className="text-[8px] font-bold text-[#888] mb-1 text-center leading-none">PITCH</span>
                   <div className="mb-6">
                     <RotaryKnob value={pitches[inst.id]} min={0.5} max={2} onChange={(v) => setPitches(prev => ({...prev, [inst.id]: v}))} size={30} />
                   </div>
-
                   <span className="text-[8px] font-bold text-[#888] mb-1 text-center leading-none">VOL</span>
                   <div className="w-6 flex-1 min-h-[100px] lg:min-h-[150px] bg-black/80 rounded shadow-inner relative flex justify-center border border-white/5 mb-2">
                     <div className="absolute inset-y-2 w-full flex flex-col justify-between items-center opacity-30 pointer-events-none">
@@ -706,63 +770,49 @@ export default function RhythmStudio() {
               ))}
             </div>
 
-            {/* MASTER FX (Nuevos Efectos 2x3 Grid) */}
             <div className="border-2 border-[#5a584e] rounded-xl p-4 bg-[#2a2923] shadow-inner relative">
               <div className="absolute -top-3 left-4 bg-[#2a2923] px-2 text-[10px] font-bold text-[#b8b29c] tracking-widest flex items-center gap-1">
                 <SlidersHorizontal className="w-3 h-3" /> MASTER FX STUDIO
               </div>
 
               <div className="grid grid-cols-3 gap-y-6 gap-x-2 mt-2">
-                
                 <div className="flex flex-col items-center">
                   <RotaryKnob value={masterDrive} min={0} max={1} onChange={setMasterDrive} size={45} isMetallic={true} />
                   <span className="text-[9px] font-bold text-[#b8b29c] tracking-widest mt-2">DRIVE</span>
                 </div>
-
                 <div className="flex flex-col items-center">
                   <RotaryKnob value={masterCrush} min={0} max={1} onChange={setMasterCrush} size={45} isMetallic={true} />
                   <span className="text-[9px] font-bold text-[#b8b29c] tracking-widest mt-2">LO-FI</span>
                 </div>
-
                 <div className="flex flex-col items-center">
                   <RotaryKnob value={masterComp} min={0} max={1} onChange={setMasterComp} size={45} isMetallic={true} />
                   <span className="text-[9px] font-bold text-[#b8b29c] tracking-widest mt-2">COMP</span>
                 </div>
-
                 <div className="flex flex-col items-center">
                   <RotaryKnob value={masterFilter} min={0} max={1} onChange={setMasterFilter} size={45} isMetallic={true} />
                   <span className="text-[9px] font-bold text-[#b8b29c] tracking-widest mt-2">MOOG LPF</span>
                 </div>
-
                 <div className="flex flex-col items-center">
                   <RotaryKnob value={masterDelay} min={0} max={1} onChange={setMasterDelay} size={45} isMetallic={true} />
                   <span className="text-[9px] font-bold text-[#b8b29c] tracking-widest mt-2">DELAY</span>
                 </div>
-
                 <div className="flex flex-col items-center">
                   <RotaryKnob value={masterReverb} min={0} max={1} onChange={setMasterReverb} size={45} isMetallic={true} />
                   <span className="text-[9px] font-bold text-[#b8b29c] tracking-widest mt-2">REVERB</span>
                 </div>
-
               </div>
 
-              {/* Master Volume Horizontal Slider replacing the old redundant sliders */}
               <div className="mt-6 pt-4 border-t border-black/30 flex items-center justify-between gap-4">
                  <span className="text-[10px] font-bold text-[#b8b29c] tracking-widest">OUTPUT</span>
                  <div className="flex-1 h-4 bg-black/80 rounded shadow-inner relative flex items-center border border-white/5">
-                    <input 
-                      type="range" min="0" max="1" step="0.05" value={masterVol} onChange={(e) => setMasterVol(parseFloat(e.target.value))}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-10"
-                    />
+                    <input type="range" min="0" max="1" step="0.05" value={masterVol} onChange={(e) => setMasterVol(parseFloat(e.target.value))} className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-10" />
                     <div className="w-5 h-7 bg-[#d4d0c5] rounded shadow-lg border border-black/50 absolute pointer-events-none transition-all" style={{ left: `${masterVol * 100}%`, transform: 'translateX(-50%)' }}>
                       <div className="w-0.5 h-full bg-black/40 mx-auto"></div>
                     </div>
                  </div>
               </div>
             </div>
-
           </div>
-
         </div>
 
       </div>
