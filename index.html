@@ -26,6 +26,7 @@
     {
       "imports": {
         "react": "https://esm.sh/react@18.2.0",
+        "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
         "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
         "lucide-react": "https://esm.sh/lucide-react@0.292.0"
       }
@@ -76,7 +77,10 @@
         // Traducir TSX
         const jsCode = Babel.transform(tsxCode, { 
           filename: 'rhythm_studio.tsx',
-          presets: ['react', 'typescript'] 
+          presets: [
+            ['react', { runtime: 'classic' }],
+            'typescript'
+          ] 
         }).code;
 
         const blob = new Blob([jsCode], { type: 'application/javascript' });
