@@ -43,7 +43,7 @@ const PRESETS = {
 };
 
 // Componente Perilla (Knob)
-const RotaryKnob = ({ value, min, max, onChange, size = 50, isMetallic = false }) => {
+const RotaryKnob = ({ value, min, max, onChange, size = 50, isMetallic = false, isMatte = false, defaultValue = null }) => {
   const knobRef = useRef(null);
   
   const handlePointerDown = (e) => {
@@ -68,6 +68,12 @@ const RotaryKnob = ({ value, min, max, onChange, size = 50, isMetallic = false }
     window.addEventListener('pointerup', handlePointerUp);
   };
 
+  const handleDoubleClick = () => {
+    if (defaultValue !== null) {
+      onChange(defaultValue);
+    }
+  };
+
   const percent = (value - min) / (max - min);
   const angle = -135 + (percent * 270);
 
@@ -76,17 +82,32 @@ const RotaryKnob = ({ value, min, max, onChange, size = 50, isMetallic = false }
       <div 
         ref={knobRef}
         onPointerDown={handlePointerDown}
-        className={`rounded-full shadow-[0_8px_15px_rgba(0,0,0,0.8),inset_0_2px_4px_rgba(255,255,255,0.2)] cursor-ns-resize border-2 border-black/40 ${isMetallic ? 'bg-gradient-to-br from-[#f0f0f0] via-[#a0a0a0] to-[#555]' : 'bg-gradient-to-br from-[#5c4a3d] to-[#2a1d13]'}`}
+        onDoubleClick={handleDoubleClick}
+        className={`rounded-full cursor-ns-resize border-2 border-black/50 transition-all
+          ${isMatte 
+            ? 'bg-[#1c1b18] border-[#3a3932] shadow-[0_4px_8px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.05)]' 
+            : isMetallic 
+              ? 'bg-gradient-to-br from-[#f0f0f0] via-[#a0a0a0] to-[#555] shadow-[0_8px_15px_rgba(0,0,0,0.8),inset_0_2px_4px_rgba(255,255,255,0.2)]' 
+              : 'bg-gradient-to-br from-[#5c4a3d] to-[#2a1d13] shadow-[0_8px_15px_rgba(0,0,0,0.8),inset_0_2px_4px_rgba(255,255,255,0.2)]'}`}
         style={{ width: size, height: size, touchAction: 'none' }}
+        title={defaultValue !== null ? `Doble clic para restablecer a ${defaultValue}` : undefined}
       >
         <div 
           className="absolute top-0 left-0 w-full h-full"
           style={{ transform: `rotate(${angle}deg)` }}
         >
           {/* Indicador */}
-          <div className={`mx-auto mt-[4px] rounded-full ${isMetallic ? 'w-1.5 h-3.5 bg-[#111] shadow-inner' : 'w-1 h-3 bg-[#eab308] shadow-[0_0_6px_rgba(234,179,8,0.6)]'}`}></div>
+          <div className={`mx-auto rounded-full 
+            ${isMatte 
+              ? 'mt-[3px] w-1 h-2 bg-[#ffaa00] shadow-[0_0_4px_rgba(255,170,0,0.8)]' 
+              : isMetallic 
+                ? 'mt-[4px] w-1.5 h-3.5 bg-[#111] shadow-inner' 
+                : 'mt-[4px] w-1 h-3 bg-[#eab308] shadow-[0_0_6px_rgba(234,179,8,0.6)]'}`}
+          />
         </div>
-        <div className="absolute inset-[20%] rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),0_1px_2px_rgba(255,255,255,0.1)] pointer-events-none"></div>
+        {!isMatte && (
+          <div className="absolute inset-[20%] rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),0_1px_2px_rgba(255,255,255,0.1)] pointer-events-none" />
+        )}
       </div>
     </div>
   );
@@ -116,6 +137,7 @@ export default function RhythmStudio() {
   const [volumes, setVolumes] = useState({ BD: 0.9, SD: 0.8, CP: 0.7, CH: 0.6, OH: 0.6, TM: 0.8, CB: 0.5 });
   const [mutes, setMutes] = useState({ BD: false, SD: false, CP: false, CH: false, OH: false, TM: false, CB: false });
   const [pitches, setPitches] = useState({ BD: 1.0, SD: 1.0, CP: 1.0, CH: 1.0, OH: 1.0, TM: 1.0, CB: 1.0 });
+  const [pans, setPans] = useState({ BD: 0.0, SD: 0.0, CP: 0.0, CH: 0.0, OH: 0.0, TM: 0.0, CB: 0.0 });
 
   // Efectos Master Avanzados
   const [masterDrive, setMasterDrive] = useState(0.0); 
@@ -154,6 +176,7 @@ export default function RhythmStudio() {
   const volumesRef = useRef(volumes);
   const mutesRef = useRef(mutes);
   const pitchesRef = useRef(pitches);
+  const pansRef = useRef(pans);
   const patternLengthRef = useRef(patternLength);
   
   useEffect(() => { drumGridRef.current = drumGrid; }, [drumGrid]);
@@ -162,11 +185,13 @@ export default function RhythmStudio() {
   useEffect(() => { volumesRef.current = volumes; }, [volumes]);
   useEffect(() => { mutesRef.current = mutes; }, [mutes]);
   useEffect(() => { pitchesRef.current = pitches; }, [pitches]);
+  useEffect(() => { pansRef.current = pans; }, [pans]);
   useEffect(() => { patternLengthRef.current = patternLength; }, [patternLength]);
 
   const nextStepTimeRef = useRef(0.0);
   const currentStepRef = useRef(0);
   const timerIdRef = useRef(null);
+  const tapTimesRef = useRef([]);
 
   const initAudio = () => {
     if (!audioCtxRef.current) {
@@ -388,6 +413,7 @@ export default function RhythmStudio() {
         if (state.tempo) setTempo(state.tempo);
         if (state.volumes) setVolumes(state.volumes);
         if (state.pitches) setPitches(state.pitches);
+        if (state.pans) setPans(state.pans);
         if (state.patternLength) setPatternLength(state.patternLength);
         if (state.masterDrive !== undefined) setMasterDrive(state.masterDrive);
         if (state.masterReverb !== undefined) setMasterReverb(state.masterReverb);
@@ -402,7 +428,7 @@ export default function RhythmStudio() {
 
   const saveStateLocally = () => {
     const state = { 
-      grid: drumGrid, tempo, volumes, pitches, patternLength, 
+      grid: drumGrid, tempo, volumes, pitches, pans, patternLength, 
       masterDrive, masterReverb, masterFilter, masterDelay, masterComp, masterCrush, masterVol 
     };
     localStorage.setItem('rhythm_studio_analog', JSON.stringify(state));
@@ -487,9 +513,16 @@ export default function RhythmStudio() {
     
     const vol = volumesRef.current[inst];
     const pitch = pitchesRef.current[inst];
+    const pan = pansRef.current[inst] !== undefined ? pansRef.current[inst] : 0.0;
+    
     const instGain = ctx.createGain();
     instGain.gain.setValueAtTime(vol, time);
-    instGain.connect(masterGainRef.current);
+    
+    const panner = ctx.createStereoPanner();
+    panner.pan.setValueAtTime(pan, time);
+    
+    instGain.connect(panner);
+    panner.connect(masterGainRef.current);
 
     const safeFreq = (f) => Math.min(f, ctx.sampleRate / 2);
 
@@ -565,6 +598,24 @@ export default function RhythmStudio() {
     }
     timerIdRef.current = setTimeout(scheduler, 25.0);
   }, []);
+
+  const handleTap = () => {
+    initAudio();
+    const now = performance.now();
+    const lastTaps = [...tapTimesRef.current, now].filter(t => now - t < 2000);
+    if (lastTaps.length > 1) {
+      let sum = 0;
+      for (let i = 1; i < lastTaps.length; i++) {
+        sum += lastTaps[i] - lastTaps[i - 1];
+      }
+      const avgInterval = sum / (lastTaps.length - 1);
+      const newBpm = Math.round(60000 / avgInterval);
+      if (newBpm >= 60 && newBpm <= 200) {
+        setTempo(newBpm);
+      }
+    }
+    tapTimesRef.current = lastTaps;
+  };
 
   const togglePlay = () => {
     initAudio();
@@ -649,7 +700,9 @@ export default function RhythmStudio() {
 
               <div className="flex flex-col items-center lg:hidden ml-auto">
                 <span className="text-[10px] font-bold text-[#b8b29c] mb-1">MIXER & FX</span>
-                <PhysicalButton onClick={() => setShowMixer(!showMixer)} active={showMixer} className="w-24 h-6 rounded-md bg-[#222] shadow-[0_3px_0_#000] text-transparent">.</PhysicalButton>
+                <PhysicalButton onClick={() => setShowMixer(!showMixer)} active={showMixer} className="w-24 h-6 rounded-md bg-[#222] shadow-[0_3px_0_#000] text-[8px] font-bold text-[#b8b29c]">
+                  {showMixer ? 'OCULTAR' : 'MOSTRAR'}
+                </PhysicalButton>
               </div>
             </div>
           </div>
@@ -663,20 +716,28 @@ export default function RhythmStudio() {
             </div>
 
             <div className="flex flex-col items-center">
-              <RotaryKnob value={tempo} min={60} max={200} onChange={(v) => setTempo(Math.round(v))} size={60} />
+              <RotaryKnob value={tempo} min={60} max={200} onChange={(v) => setTempo(Math.round(v))} size={60} defaultValue={128} />
               <div className="flex justify-between w-full px-2 mt-1">
                 <span className="text-[8px] text-[#888] font-bold">60</span><span className="text-[8px] text-[#888] font-bold">200</span>
               </div>
               <span className="text-[11px] font-bold text-[#b8b29c] tracking-widest mt-1">TEMPO</span>
             </div>
 
-            <div className="bg-[#1a1205] border-2 border-black/80 rounded-md px-4 py-2 shadow-[inset_0_2px_8px_rgba(0,0,0,1)] mb-6">
-              <span className="font-['Share_Tech_Mono'] text-3xl text-[#ffaa00] drop-shadow-[0_0_8px_rgba(255,170,0,0.6)]">{Math.round(tempo)}</span>
-              <span className="font-['Share_Tech_Mono'] text-sm text-[#ffaa00]/70 ml-1">BPM</span>
+            <div className="flex flex-col items-center mb-6">
+              <div className="bg-[#1a1205] border-2 border-black/80 rounded-md px-4 py-2 shadow-[inset_0_2px_8px_rgba(0,0,0,1)]">
+                <span className="font-['Share_Tech_Mono'] text-3xl text-[#ffaa00] drop-shadow-[0_0_8px_rgba(255,170,0,0.6)]">{Math.round(tempo)}</span>
+                <span className="font-['Share_Tech_Mono'] text-sm text-[#ffaa00]/70 ml-1">BPM</span>
+              </div>
+              <button 
+                onClick={handleTap} 
+                className="mt-2 px-3 py-1 bg-[#2b2a22] hover:bg-[#3d3c33] active:bg-[#ffaa00] active:text-[#111] border border-black/60 rounded text-[9px] font-bold text-[#b8b29c] shadow-[0_2px_0_#151411] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer font-mono tracking-widest"
+              >
+                TAP
+              </button>
             </div>
 
             <div className="flex flex-col items-center">
-              <RotaryKnob value={swing} min={0} max={0.5} onChange={setSwing} size={60} />
+              <RotaryKnob value={swing} min={0} max={0.5} onChange={setSwing} size={60} defaultValue={0.0} />
               <div className="flex justify-between w-full px-2 mt-1">
                 <span className="text-[8px] text-[#888] font-bold">0</span><span className="text-[8px] text-[#888] font-bold">MAX</span>
               </div>
@@ -739,35 +800,41 @@ export default function RhythmStudio() {
 
         <div className={`lg:w-[480px] shrink-0 bg-gradient-to-b from-[#3a3931] to-[#2a2921] flex-col ${showMixer ? 'flex' : 'hidden lg:flex'}`}>
           <div className="p-4 sm:p-6 flex-1 flex flex-col justify-between">
-            <div className="grid grid-cols-7 gap-1 sm:gap-2 lg:gap-3 border-2 border-[#5a584e] rounded-xl p-2 sm:p-4 bg-[#2a2923] shadow-inner flex-1 mb-6">
-              {INSTRUMENTS.map((inst, idx) => (
-                <div key={inst.id} className={`flex flex-col items-center pt-2 ${idx !== 6 ? 'border-r border-black/30' : ''}`}>
-                  <span className={`text-[10px] lg:text-[11px] font-bold mb-4 ${inst.id === 'SD' ? 'text-[#a38a6a]' : inst.id === 'CP' ? 'text-orange-400' : inst.id === 'CH' ? 'text-yellow-400' : inst.id === 'OH' ? 'text-lime-400' : inst.id === 'TM' ? 'text-blue-400' : inst.id === 'CB' ? 'text-purple-400' : 'text-[#b8b29c]'}`}>
-                    {inst.id}
-                  </span>
-                  <span className="text-[8px] font-bold text-[#888] mb-1">MUTE</span>
-                  <button onClick={() => setMutes(prev => ({...prev, [inst.id]: !prev[inst.id]}))} className="w-4 h-8 bg-black/50 rounded-full shadow-inner relative flex justify-center mb-6 border border-white/5">
-                    <div className={`w-3 h-4 bg-gradient-to-b from-[#eee] to-[#888] rounded-full shadow-md absolute transition-all ${mutes[inst.id] ? 'bottom-[2px]' : 'top-[2px]'}`}></div>
-                  </button>
-                  <span className="text-[8px] font-bold text-[#888] mb-1 text-center leading-none">PITCH</span>
-                  <div className="mb-6">
-                    <RotaryKnob value={pitches[inst.id]} min={0.5} max={2} onChange={(v) => setPitches(prev => ({...prev, [inst.id]: v}))} size={30} />
-                  </div>
-                  <span className="text-[8px] font-bold text-[#888] mb-1 text-center leading-none">VOL</span>
-                  <div className="w-6 flex-1 min-h-[100px] lg:min-h-[150px] bg-black/80 rounded shadow-inner relative flex justify-center border border-white/5 mb-2">
-                    <div className="absolute inset-y-2 w-full flex flex-col justify-between items-center opacity-30 pointer-events-none">
-                      {[...Array(9)].map((_, i) => <div key={i} className="w-4 h-px bg-white"></div>)}
+            <div className="overflow-x-auto w-full flex-1 flex flex-col mb-6">
+              <div className="grid grid-cols-7 gap-1 sm:gap-2 lg:gap-3 border-2 border-[#5a584e] rounded-xl p-2 sm:p-4 bg-[#2a2923] shadow-inner flex-1 min-w-[460px] lg:min-w-0">
+                {INSTRUMENTS.map((inst, idx) => (
+                  <div key={inst.id} className={`flex flex-col items-center pt-2 ${idx !== 6 ? 'border-r border-black/30' : ''}`}>
+                    <span className={`text-[10px] lg:text-[11px] font-bold mb-2 lg:mb-4 ${inst.id === 'SD' ? 'text-[#a38a6a]' : inst.id === 'CP' ? 'text-orange-400' : inst.id === 'CH' ? 'text-yellow-400' : inst.id === 'OH' ? 'text-lime-400' : inst.id === 'TM' ? 'text-blue-400' : inst.id === 'CB' ? 'text-purple-400' : 'text-[#b8b29c]'}`}>
+                      {inst.id}
+                    </span>
+                    <span className="text-[8px] font-bold text-[#888] mb-1">MUTE</span>
+                    <button onClick={() => setMutes(prev => ({...prev, [inst.id]: !prev[inst.id]}))} className="w-4 h-8 bg-black/50 rounded-full shadow-inner relative flex justify-center mb-3 lg:mb-6 border border-white/5">
+                      <div className={`w-3 h-4 bg-gradient-to-b from-[#eee] to-[#888] rounded-full shadow-md absolute transition-all ${mutes[inst.id] ? 'bottom-[2px]' : 'top-[2px]'}`}></div>
+                    </button>
+                    <span className="text-[8px] font-bold text-[#888] mb-1 text-center leading-none">PITCH</span>
+                    <div className="mb-3 lg:mb-6">
+                      <RotaryKnob value={pitches[inst.id]} min={0.5} max={2} onChange={(v) => setPitches(prev => ({...prev, [inst.id]: v}))} size={30} defaultValue={1.0} />
                     </div>
-                    <input 
-                      type="range" min="0" max="1" step="0.05" value={volumes[inst.id]} onChange={(e) => setVolumes(prev => ({...prev, [inst.id]: parseFloat(e.target.value)}))}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize z-10" style={{ writingMode: 'bt-lr', WebkitAppearance: 'slider-vertical' }}
-                    />
-                    <div className={`w-5 h-8 ${inst.capColor} rounded shadow-lg border border-black/50 absolute pointer-events-none transition-all`} style={{ bottom: `${volumes[inst.id] * 100}%`, transform: 'translateY(50%)' }}>
-                      <div className="w-full h-1 bg-black/40 mt-3.5 shadow-sm"></div>
+                    <span className="text-[8px] font-bold text-[#888] mb-1 text-center leading-none">PAN</span>
+                    <div className="mb-3 lg:mb-6">
+                      <RotaryKnob value={pans[inst.id] || 0.0} min={-1} max={1} onChange={(v) => setPans(prev => ({...prev, [inst.id]: v}))} size={30} defaultValue={0.0} />
+                    </div>
+                    <span className="text-[8px] font-bold text-[#888] mb-1 text-center leading-none">VOL</span>
+                    <div className="w-6 flex-1 min-h-[100px] lg:min-h-[150px] bg-black/80 rounded shadow-inner relative flex justify-center border border-white/5 mb-2">
+                      <div className="absolute inset-y-2 w-full flex flex-col justify-between items-center opacity-30 pointer-events-none">
+                        {[...Array(9)].map((_, i) => <div key={i} className="w-4 h-px bg-white"></div>)}
+                      </div>
+                      <input 
+                        type="range" min="0" max="1" step="0.05" value={volumes[inst.id]} onChange={(e) => setVolumes(prev => ({...prev, [inst.id]: parseFloat(e.target.value)}))}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize z-10" style={{ writingMode: 'bt-lr', WebkitAppearance: 'slider-vertical' }}
+                      />
+                      <div className={`w-5 h-8 ${inst.capColor} rounded shadow-lg border border-black/50 absolute pointer-events-none transition-all`} style={{ bottom: `${volumes[inst.id] * 100}%`, transform: 'translateY(50%)' }}>
+                        <div className="w-full h-1 bg-black/40 mt-3.5 shadow-sm"></div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
 
             <div className="border-2 border-[#5a584e] rounded-xl p-4 bg-[#2a2923] shadow-inner relative">
@@ -777,27 +844,27 @@ export default function RhythmStudio() {
 
               <div className="grid grid-cols-3 gap-y-6 gap-x-2 mt-2">
                 <div className="flex flex-col items-center">
-                  <RotaryKnob value={masterDrive} min={0} max={1} onChange={setMasterDrive} size={45} isMetallic={true} />
+                  <RotaryKnob value={masterDrive} min={0} max={1} onChange={setMasterDrive} size={32} isMatte={true} defaultValue={0.0} />
                   <span className="text-[9px] font-bold text-[#b8b29c] tracking-widest mt-2">DRIVE</span>
                 </div>
                 <div className="flex flex-col items-center">
-                  <RotaryKnob value={masterCrush} min={0} max={1} onChange={setMasterCrush} size={45} isMetallic={true} />
+                  <RotaryKnob value={masterCrush} min={0} max={1} onChange={setMasterCrush} size={32} isMatte={true} defaultValue={0.0} />
                   <span className="text-[9px] font-bold text-[#b8b29c] tracking-widest mt-2">LO-FI</span>
                 </div>
                 <div className="flex flex-col items-center">
-                  <RotaryKnob value={masterComp} min={0} max={1} onChange={setMasterComp} size={45} isMetallic={true} />
+                  <RotaryKnob value={masterComp} min={0} max={1} onChange={setMasterComp} size={32} isMatte={true} defaultValue={0.0} />
                   <span className="text-[9px] font-bold text-[#b8b29c] tracking-widest mt-2">COMP</span>
                 </div>
                 <div className="flex flex-col items-center">
-                  <RotaryKnob value={masterFilter} min={0} max={1} onChange={setMasterFilter} size={45} isMetallic={true} />
+                  <RotaryKnob value={masterFilter} min={0} max={1} onChange={setMasterFilter} size={32} isMatte={true} defaultValue={1.0} />
                   <span className="text-[9px] font-bold text-[#b8b29c] tracking-widest mt-2">MOOG LPF</span>
                 </div>
                 <div className="flex flex-col items-center">
-                  <RotaryKnob value={masterDelay} min={0} max={1} onChange={setMasterDelay} size={45} isMetallic={true} />
+                  <RotaryKnob value={masterDelay} min={0} max={1} onChange={setMasterDelay} size={32} isMatte={true} defaultValue={0.0} />
                   <span className="text-[9px] font-bold text-[#b8b29c] tracking-widest mt-2">DELAY</span>
                 </div>
                 <div className="flex flex-col items-center">
-                  <RotaryKnob value={masterReverb} min={0} max={1} onChange={setMasterReverb} size={45} isMetallic={true} />
+                  <RotaryKnob value={masterReverb} min={0} max={1} onChange={setMasterReverb} size={32} isMatte={true} defaultValue={0.0} />
                   <span className="text-[9px] font-bold text-[#b8b29c] tracking-widest mt-2">REVERB</span>
                 </div>
               </div>
